@@ -487,6 +487,8 @@ var bigZero = big.NewInt(0)
 var bigOne = big.NewInt(1)
 
 func (ka *dheKeyAgreement) generateServerKeyExchange(config *Config, cert *Certificate, clientHello *clientHelloMsg, hello *serverHelloMsg) (*serverKeyExchangeMsg, error) {
+	// Shouldn't possible for a DHE ciphersuite to have been chosen by a server with a nil
+	// DhParameters, but extra care
 	if config.DhParameters == nil {
 		return nil, errors.New("tls: config is missing Diffie-Hellman parameters needed for DHE ciphersuite")
 	}

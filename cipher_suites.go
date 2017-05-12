@@ -48,6 +48,10 @@ const (
 	// certificate is ECDSA. If this is not set then the cipher suite is
 	// RSA based.
 	suiteECDSA
+	// suiteDHE indicates that the cipher suite involves Diffie-Hellman. This
+	// means that a server should only use it if there's configured DH
+	// parameters.
+	suiteDHE
 	// suiteTLS12 indicates that the cipher suite should only be advertised
 	// and accepted when using TLS 1.2.
 	suiteTLS12
@@ -99,12 +103,12 @@ var cipherSuites = []*cipherSuite{
 	{TLS_RSA_WITH_3DES_EDE_CBC_SHA, 24, 20, 8, rsaKA, 0, cipher3DES, macSHA1, nil},
 
 	// DHE PFS ciphersuites are disabled by default due to slowness
-	{TLS_DHE_RSA_WITH_AES_256_GCM_SHA384, 32, 0, 4, dheRSAKA, suiteTLS12 | suiteSHA384 | suiteDefaultOff, nil, nil, aeadAESGCM},
-	{TLS_DHE_RSA_WITH_AES_128_GCM_SHA256, 16, 0, 4, dheRSAKA, suiteDefaultOff, nil, nil, aeadAESGCM},
-	{TLS_DHE_RSA_WITH_AES_256_CBC_SHA256, 32, 32, 16, dheRSAKA, suiteDefaultOff, cipherAES, macSHA256, nil},
-	{TLS_DHE_RSA_WITH_AES_128_CBC_SHA256, 16, 32, 16, dheRSAKA, suiteDefaultOff, cipherAES, macSHA256, nil},
-	{TLS_DHE_RSA_WITH_AES_256_CBC_SHA, 32, 20, 16, dheRSAKA, suiteDefaultOff, cipherAES, macSHA1, nil},
-	{TLS_DHE_RSA_WITH_AES_128_CBC_SHA, 16, 20, 16, dheRSAKA, suiteDefaultOff, cipherAES, macSHA1, nil},
+	{TLS_DHE_RSA_WITH_AES_256_GCM_SHA384, 32, 0, 4, dheRSAKA, suiteDHE | suiteTLS12 | suiteSHA384 | suiteDefaultOff, nil, nil, aeadAESGCM},
+	{TLS_DHE_RSA_WITH_AES_128_GCM_SHA256, 16, 0, 4, dheRSAKA, suiteDHE | suiteDefaultOff, nil, nil, aeadAESGCM},
+	{TLS_DHE_RSA_WITH_AES_256_CBC_SHA256, 32, 32, 16, dheRSAKA, suiteDHE | suiteDefaultOff, cipherAES, macSHA256, nil},
+	{TLS_DHE_RSA_WITH_AES_128_CBC_SHA256, 16, 32, 16, dheRSAKA, suiteDHE | suiteDefaultOff, cipherAES, macSHA256, nil},
+	{TLS_DHE_RSA_WITH_AES_256_CBC_SHA, 32, 20, 16, dheRSAKA, suiteDHE | suiteDefaultOff, cipherAES, macSHA1, nil},
+	{TLS_DHE_RSA_WITH_AES_128_CBC_SHA, 16, 20, 16, dheRSAKA, suiteDHE | suiteDefaultOff, cipherAES, macSHA1, nil},
 
 	// RC4-based cipher suites are disabled by default.
 	{TLS_RSA_WITH_RC4_128_SHA, 16, 20, 0, rsaKA, suiteDefaultOff, cipherRC4, macSHA1, nil},

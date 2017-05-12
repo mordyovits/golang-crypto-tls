@@ -797,6 +797,12 @@ func (hs *serverHandshakeState) setCipherSuite(id uint16, supportedCipherSuites 
 			} else if !hs.rsaDecryptOk {
 				continue
 			}
+			// If DH Parameters weren't configured, can't use DHE
+			if candidate.flags&suiteDHE != 0 {
+				if hs.c.config.DhParameters == nil {
+					continue
+				}
+			}
 			if version < VersionTLS12 && candidate.flags&suiteTLS12 != 0 {
 				continue
 			}

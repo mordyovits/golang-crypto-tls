@@ -696,8 +696,12 @@ func (ka *dheKeyAgreement) processServerKeyExchange(config *Config, clientHello 
 	// store server's dh params in ka
 	ka.dhp.P = new(big.Int).SetBytes(serverP)
 	ka.dhp.G = new(big.Int).SetBytes(serverG)
-	ka.Ys = new(big.Int).SetBytes(serverPubKey)
+	err = validateDhParams(ka.dhp)
+	if err != nil {
+		return err
+	}
 
+	ka.Ys = new(big.Int).SetBytes(serverPubKey)
 	// validate that the server's PubKey is non-zero
 	if ka.Ys.Cmp(bigZero) == 0 {
 		return errors.New("tls: invalid server DHE public key")

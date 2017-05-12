@@ -483,6 +483,7 @@ type dheKeyAgreement struct {
 	x *big.Int // Server's private key
 }
 
+var bigZero = big.NewInt(0)
 var bigOne = big.NewInt(1)
 
 func (ka *dheKeyAgreement) generateServerKeyExchange(config *Config, cert *Certificate, clientHello *clientHelloMsg, hello *serverHelloMsg) (*serverKeyExchangeMsg, error) {
@@ -696,6 +697,11 @@ func (ka *dheKeyAgreement) processServerKeyExchange(config *Config, clientHello 
 	ka.dhp.P = new(big.Int).SetBytes(serverP)
 	ka.dhp.G = new(big.Int).SetBytes(serverG)
 	ka.Ys = new(big.Int).SetBytes(serverPubKey)
+
+	// validate that the server's PubKey is non-zero
+	if ka.Ys.Cmp(bigZero) == 0 {
+		return errors.New("tls: invalid server DHE public key")
+	}
 
 	return nil
 }

@@ -353,6 +353,8 @@ func ecdheRSAKA(version uint16) keyAgreement {
 	}
 }
 
+// no dheECDSAKA because there's no implemented ciphersuite that uses DHE and ECDSA
+
 func dheRSAKA(version uint16) keyAgreement {
 	return &dheKeyAgreement{
 		sigType: signatureRSA,

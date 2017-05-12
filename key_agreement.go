@@ -548,7 +548,7 @@ func (ka *dheKeyAgreement) generateServerKeyExchange(config *Config, cert *Certi
 	}
 	var sig []byte
 	switch ka.sigType {
-	/*
+	/* // Currently there are no ciphersuites implemented in crypto/tls that use DHE and ECDSA
 	   case signatureECDSA:
 	       _, ok := priv.Public().(*ecdsa.PublicKey)
 	       if !ok {
@@ -676,7 +676,7 @@ func (ka *dheKeyAgreement) processServerKeyExchange(config *Config, clientHello 
 	}
 
 	switch ka.sigType {
-	//case signatureECDSA: // TODO cut and paste from ECDHE?  Can't test it now.  Not even sure if possible
+	//case signatureECDSA: // Currently there are no ciphersuites implemented in crypto/tls that use DHE and ECDSA
 	case signatureRSA:
 		pubKey, ok := cert.PublicKey.(*rsa.PublicKey)
 		if !ok {

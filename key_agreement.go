@@ -474,10 +474,13 @@ func (ka *ecdheKeyAgreement) generateClientKeyExchange(config *Config, clientHel
 }
 
 type dheKeyAgreement struct {
-	version  uint16
-	sigType  uint8
-	p, g, Ys *big.Int // stuff stored in ka by client. Ys is server's pubkey
-	x        *big.Int // stuff stored in ka by server. x is server's private key
+	version uint16
+	sigType uint8
+	// stuff stored in ka by client
+	dhp DhParams // Server's dh params
+	Ys  *big.Int // Server's pubkey
+	// stuff stored in ka by server
+	x *big.Int // Server's private key
 }
 
 var bigOne = big.NewInt(1)
@@ -690,8 +693,8 @@ func (ka *dheKeyAgreement) processServerKeyExchange(config *Config, clientHello 
 	}
 
 	// store server's dh params in ka
-	ka.p = new(big.Int).SetBytes(serverP)
-	ka.g = new(big.Int).SetBytes(serverG)
+	ka.dhp.P = new(big.Int).SetBytes(serverP)
+	ka.dhp.G = new(big.Int).SetBytes(serverG)
 	ka.Ys = new(big.Int).SetBytes(serverPubKey)
 
 	return nil
@@ -700,7 +703,7 @@ func (ka *dheKeyAgreement) processServerKeyExchange(config *Config, clientHello 
 func (ka *dheKeyAgreement) generateClientKeyExchange(config *Config, clientHello *clientHelloMsg, cert *x509.Certificate) ([]byte, *clientKeyExchangeMsg, error) {
 	var preMasterSecret []byte
 
-	pMinus1 := new(big.Int).Sub(ka.p, bigOne)
+	pMinus1 := new(big.Int).Sub(ka.dhp.P, bigOne)
 
 	// create a private key based on server's p and g
 	var x *big.Int
@@ -715,7 +718,7 @@ func (ka *dheKeyAgreement) generateClientKeyExchange(config *Config, clientHello
 	}
 
 	// create a public key and immediately get the bytes, since that's all we'll need
-	XBytes := new(big.Int).Exp(ka.g, x, ka.p).Bytes()
+	XBytes := new(big.Int).Exp(ka.dhp.G, x, ka.dhp.P).Bytes()
 	lenXBytes := len(XBytes)
 
 	// derive Z
@@ -724,7 +727,7 @@ func (ka *dheKeyAgreement) generateClientKeyExchange(config *Config, clientHello
 	if ka.Ys.Cmp(bigOne) <= 0 || ka.Ys.Cmp(pMinus1) >= 0 {
 		return nil, nil, errors.New("tls: Server DH parameter out of bounds")
 	}
-	preMasterSecret = new(big.Int).Exp(ka.Ys, x, ka.p).Bytes()
+	preMasterSecret = new(big.Int).Exp(ka.Ys, x, ka.dhp.P).Bytes()
 
 	ckx := new(clientKeyExchangeMsg)
 	ckx.ciphertext = make([]byte, 2+lenXBytes)

@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"net"
 	"strings"
 	"time"
@@ -297,6 +298,23 @@ func parsePrivateKey(der []byte) (crypto.PrivateKey, error) {
 	return nil, errors.New("tls: failed to parse private key")
 }
 
+// Validate DH Parameters. Confirms that:
+// p is odd
+// 1 < g < p - 1
+func validateDhParams(dhp DhParams) error {
+	if dhp.P.Bit(0) == 0 {
+		return errors.New("tls: invalid Diff-Hellman parameter P")
+	}
+	if dhp.G.Cmp(bigOne) < 1 {
+		return errors.New("tls: invalid Diff-Hellman parameter G")
+	}
+	pMinus1 := new(big.Int).Sub(dhp.P, bigOne)
+	if pMinus1.Cmp(dhp.G) < 1 {
+		return errors.New("tls: invalid Diff-Hellman parameters")
+	}
+	return nil
+}
+
 // Attempt to parse the given DH Params DER block.
 func parseDhParams(der []byte) (DhParams, error) {
 	var dhp DhParams
@@ -308,7 +326,10 @@ func parseDhParams(der []byte) (DhParams, error) {
 		return DhParams{}, err
 	}
 
-	// TODO any validation of p and g?
+	err = validateDhParams(dhp)
+	if err != nil {
+		return DhParams{}, err
+	}
 
 	return dhp, nil
 }

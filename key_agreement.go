@@ -480,6 +480,8 @@ type dheKeyAgreement struct {
 	x        *big.Int // stuff stored in ka by server. x is server's private key
 }
 
+var bigOne = big.NewInt(1)
+
 func (ka *dheKeyAgreement) generateServerKeyExchange(config *Config, cert *Certificate, clientHello *clientHelloMsg, hello *serverHelloMsg) (*serverKeyExchangeMsg, error) {
 	if config.DhParamP == nil || config.DhParamG == nil {
 		return nil, errors.New("tls: config is missing DH params needed for DHE ciphersuite")
@@ -694,8 +696,6 @@ func (ka *dheKeyAgreement) processServerKeyExchange(config *Config, clientHello 
 
 	return nil
 }
-
-var bigOne = big.NewInt(1)
 
 func (ka *dheKeyAgreement) generateClientKeyExchange(config *Config, clientHello *clientHelloMsg, cert *x509.Certificate) ([]byte, *clientKeyExchangeMsg, error) {
 	var preMasterSecret []byte

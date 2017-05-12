@@ -15,6 +15,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/asn1"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -294,4 +295,46 @@ func parsePrivateKey(der []byte) (crypto.PrivateKey, error) {
 	}
 
 	return nil, errors.New("tls: failed to parse private key")
+}
+
+// Attempt to parse the given DH Params DER block.
+func parseDhParams(der []byte) (DhParams, error) {
+	var dhp DhParams
+	rest, err := asn1.Unmarshal(der, &dhp)
+	if len(rest) > 0 {
+		return DhParams{}, asn1.SyntaxError{Msg: "trailing data"}
+	}
+	if err != nil {
+		return DhParams{}, err
+	}
+
+	// TODO any validation of p and g?
+
+	return dhp, nil
+}
+
+// LoadDhParams reads and parses the Diff-Hellman parameters p and g from a file.
+// The file must contain PEM encoded data.
+func LoadDhParams(DhParamsFile string) (DhParams, error) {
+	dhparamsPEMBlock, err := ioutil.ReadFile(DhParamsFile)
+	if err != nil {
+		return DhParams{}, err
+	}
+	return dhParamsPEM(dhparamsPEMBlock)
+}
+
+func dhParamsPEM(dhparamsPEMBlock []byte) (DhParams, error) {
+	block, _ := pem.Decode(dhparamsPEMBlock) // expect only one block in a dhparams.pem, so ignore rest
+	if block == nil {
+		return DhParams{}, errors.New("tls: failed to decode DhParams PEM")
+	}
+	if block.Type != "DH PARAMETERS" {
+		return DhParams{}, errors.New("tls: failed to decode DhParams PEM")
+	}
+	dhp, err := parseDhParams(block.Bytes)
+	if err != nil {
+		return DhParams{}, err
+	}
+
+	return dhp, nil
 }

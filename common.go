@@ -106,6 +106,13 @@ const (
 	pointFormatUncompressed uint8 = 0
 )
 
+// DhParams is the p ang g parameters needed for Diffie-Hellman Key Agreement
+type DhParams struct {
+	P *big.Int
+	G *big.Int
+	//RecommendedPrivateLength int
+}
+
 // TLS CertificateStatusType (RFC 3546)
 const (
 	statusTypeOCSP uint8 = 1
@@ -489,8 +496,8 @@ type Config struct {
 	CurvePreferences []CurveID
 
 	// Diffie-Hellman parameters P and G
-	// Typically loaded from a dhparam.pem file
-	DhParamP, DhParamG *big.Int
+	// Typically loaded from a dhparam.pem file with LoadDhParams()
+	DhParameters *DhParams
 
 	// DynamicRecordSizingDisabled disables adaptive sizing of TLS records.
 	// When true, the largest possible TLS record size is always used. When
@@ -584,8 +591,7 @@ func (c *Config) Clone() *Config {
 		MinVersion:                  c.MinVersion,
 		MaxVersion:                  c.MaxVersion,
 		CurvePreferences:            c.CurvePreferences,
-		DhParamP:                    c.DhParamP,
-		DhParamG:                    c.DhParamG,
+		DhParameters:                c.DhParameters,
 		DynamicRecordSizingDisabled: c.DynamicRecordSizingDisabled,
 		Renegotiation:               c.Renegotiation,
 		KeyLogWriter:                c.KeyLogWriter,

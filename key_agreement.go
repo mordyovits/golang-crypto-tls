@@ -483,17 +483,17 @@ type dheKeyAgreement struct {
 var bigOne = big.NewInt(1)
 
 func (ka *dheKeyAgreement) generateServerKeyExchange(config *Config, cert *Certificate, clientHello *clientHelloMsg, hello *serverHelloMsg) (*serverKeyExchangeMsg, error) {
-	if config.DhParamP == nil || config.DhParamG == nil {
-		return nil, errors.New("tls: config is missing DH params needed for DHE ciphersuite")
+	if config.DhParameters == nil {
+		return nil, errors.New("tls: config is missing Diffie-Hellman parameters needed for DHE ciphersuite")
 	}
 
-	pBytes := config.DhParamP.Bytes()
+	pBytes := config.DhParameters.P.Bytes()
 	lenPBytes := len(pBytes)
-	gBytes := config.DhParamG.Bytes()
+	gBytes := config.DhParameters.G.Bytes()
 	lenGBytes := len(gBytes)
 
 	// create a private key based on p and g
-	pMinus1 := new(big.Int).Sub(config.DhParamP, bigOne)
+	pMinus1 := new(big.Int).Sub(config.DhParameters.P, bigOne)
 	for {
 		var err error
 		if ka.x, err = rand.Int(config.rand(), pMinus1); err != nil {
@@ -505,7 +505,7 @@ func (ka *dheKeyAgreement) generateServerKeyExchange(config *Config, cert *Certi
 	}
 
 	// create a public key
-	pubKey := new(big.Int).Exp(config.DhParamG, ka.x, config.DhParamP)
+	pubKey := new(big.Int).Exp(config.DhParameters.G, ka.x, config.DhParameters.P)
 	pubKeyBytes := pubKey.Bytes()
 	lenPubKeyBytes := len(pubKeyBytes)
 
@@ -600,12 +600,12 @@ func (ka *dheKeyAgreement) processClientKeyExchange(config *Config, cert *Certif
 
 	clientPubKey := new(big.Int).SetBytes(ckx.ciphertext[2:])
 
-	pMinus1 := new(big.Int).Sub(config.DhParamP, bigOne)
+	pMinus1 := new(big.Int).Sub(config.DhParameters.P, bigOne)
 
 	if clientPubKey.Cmp(bigOne) <= 0 || clientPubKey.Cmp(pMinus1) >= 0 {
 		return nil, errors.New("tls: Client DH parameter out of bounds")
 	}
-	preMasterSecret := new(big.Int).Exp(clientPubKey, ka.x, config.DhParamP).Bytes()
+	preMasterSecret := new(big.Int).Exp(clientPubKey, ka.x, config.DhParameters.P).Bytes()
 
 	return preMasterSecret, nil
 }

@@ -9,6 +9,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/md5"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/x509"
@@ -468,6 +469,268 @@ func (ka *ecdheKeyAgreement) generateClientKeyExchange(config *Config, clientHel
 	ckx.ciphertext = make([]byte, 1+len(serialized))
 	ckx.ciphertext[0] = byte(len(serialized))
 	copy(ckx.ciphertext[1:], serialized)
+
+	return preMasterSecret, ckx, nil
+}
+
+type dheKeyAgreement struct {
+	version  uint16
+	sigType  uint8
+	p, g, Ys *big.Int // stuff stored in ka by client. Ys is server's pubkey
+	x        *big.Int // stuff stored in ka by server. x is server's private key
+}
+
+func (ka *dheKeyAgreement) generateServerKeyExchange(config *Config, cert *Certificate, clientHello *clientHelloMsg, hello *serverHelloMsg) (*serverKeyExchangeMsg, error) {
+	if config.DhParamP == nil || config.DhParamG == nil {
+		return nil, errors.New("tls: config is missing DH params needed for DHE ciphersuite")
+	}
+
+	pBytes := config.DhParamP.Bytes()
+	lenPBytes := len(pBytes)
+	gBytes := config.DhParamG.Bytes()
+	lenGBytes := len(gBytes)
+
+	// create a private key based on p and g
+	pMinus1 := new(big.Int).Sub(config.DhParamP, bigOne)
+	for {
+		var err error
+		if ka.x, err = rand.Int(config.rand(), pMinus1); err != nil {
+			return nil, err
+		}
+		if ka.x.Sign() > 0 {
+			break
+		}
+	}
+
+	// create a public key
+	pubKey := new(big.Int).Exp(config.DhParamG, ka.x, config.DhParamP)
+	pubKeyBytes := pubKey.Bytes()
+	lenPubKeyBytes := len(pubKeyBytes)
+
+	lenServerDHParams := 2 + lenPBytes + 2 + lenGBytes + 2 + lenPubKeyBytes
+	serverDHParams := make([]byte, lenServerDHParams)
+
+	// pack the serverDHparams
+	serverDHParams[0] = byte(lenPBytes >> 8)
+	serverDHParams[1] = byte(lenPBytes)
+	copy(serverDHParams[2:], pBytes)
+
+	gLenOffset := 2 + lenPBytes
+	serverDHParams[gLenOffset] = byte(lenGBytes >> 8)
+	serverDHParams[gLenOffset+1] = byte(lenGBytes)
+	copy(serverDHParams[gLenOffset+2:], gBytes)
+
+	pubKeyLenOffset := gLenOffset + 2 + lenGBytes
+	serverDHParams[pubKeyLenOffset] = byte(lenPubKeyBytes >> 8)
+	serverDHParams[pubKeyLenOffset+1] = byte(lenPubKeyBytes)
+	copy(serverDHParams[pubKeyLenOffset+2:], pubKeyBytes)
+
+	//sign the serverDHParams
+	sigAndHash := signatureAndHash{signature: ka.sigType}
+
+	if ka.version >= VersionTLS12 {
+		var err error
+		if sigAndHash.hash, err = pickTLS12HashForSignature(ka.sigType, clientHello.signatureAndHashes); err != nil {
+			return nil, err
+		}
+	}
+
+	digest, hashFunc, err := hashForServerKeyExchange(sigAndHash, ka.version, clientHello.random, hello.random, serverDHParams)
+	if err != nil {
+		return nil, err
+	}
+
+	priv, ok := cert.PrivateKey.(crypto.Signer)
+	if !ok {
+		return nil, errors.New("tls: certificate private key does not implement crypto.Signer")
+	}
+	var sig []byte
+	switch ka.sigType {
+	/*
+	   case signatureECDSA:
+	       _, ok := priv.Public().(*ecdsa.PublicKey)
+	       if !ok {
+	           return nil, errors.New("tls: DHE ECDSA requires an ECDSA server key")
+	       }
+	*/
+	case signatureRSA:
+		_, ok := priv.Public().(*rsa.PublicKey)
+		if !ok {
+			return nil, errors.New("tls: DHE RSA requires a RSA server key")
+		}
+	default:
+		return nil, errors.New("tls: unknown DHE signature algorithm")
+	}
+	sig, err = priv.Sign(config.rand(), digest, hashFunc)
+	if err != nil {
+		return nil, errors.New("tls: failed to sign DHE parameters: " + err.Error())
+	}
+
+	skx := new(serverKeyExchangeMsg)
+	sigAndHashLen := 0
+	if ka.version >= VersionTLS12 {
+		sigAndHashLen = 2
+	}
+	skx.key = make([]byte, len(serverDHParams)+sigAndHashLen+2+len(sig))
+	copy(skx.key, serverDHParams)
+	k := skx.key[len(serverDHParams):]
+	if ka.version >= VersionTLS12 {
+		k[0] = sigAndHash.hash
+		k[1] = sigAndHash.signature
+		k = k[2:]
+	}
+	k[0] = byte(len(sig) >> 8)
+	k[1] = byte(len(sig))
+	copy(k[2:], sig)
+
+	return skx, nil
+}
+
+func (ka *dheKeyAgreement) processClientKeyExchange(config *Config, cert *Certificate, ckx *clientKeyExchangeMsg, version uint16) ([]byte, error) {
+	if len(ckx.ciphertext) < 2 {
+		return nil, errClientKeyExchange
+	}
+	clientPubKeyLen := int(ckx.ciphertext[0])<<8 | int(ckx.ciphertext[1])
+
+	if len(ckx.ciphertext) != 2+clientPubKeyLen {
+		return nil, errClientKeyExchange
+	}
+
+	clientPubKey := new(big.Int).SetBytes(ckx.ciphertext[2:])
+
+	pMinus1 := new(big.Int).Sub(config.DhParamP, bigOne)
+
+	if clientPubKey.Cmp(bigOne) <= 0 || clientPubKey.Cmp(pMinus1) >= 0 {
+		return nil, errors.New("tls: Client DH parameter out of bounds")
+	}
+	preMasterSecret := new(big.Int).Exp(clientPubKey, ka.x, config.DhParamP).Bytes()
+	return preMasterSecret, nil
+
+}
+
+func (ka *dheKeyAgreement) processServerKeyExchange(config *Config, clientHello *clientHelloMsg, serverHello *serverHelloMsg, cert *x509.Certificate, skx *serverKeyExchangeMsg) error {
+	if len(skx.key) < 2 {
+		return errServerKeyExchange
+	}
+	pLen := int(skx.key[0])<<8 | int(skx.key[1])
+
+	if 2+pLen > len(skx.key) {
+		return errServerKeyExchange
+	}
+	serverP := skx.key[2 : pLen+2]
+
+	if 2+pLen+2 > len(skx.key) {
+		return errServerKeyExchange
+	}
+	gLenOffset := 2 + pLen
+	gLen := int(skx.key[gLenOffset])<<8 | int(skx.key[gLenOffset+1])
+
+	if 2+pLen+2+gLen > len(skx.key) {
+		return errServerKeyExchange
+	}
+	serverG := skx.key[gLenOffset+2 : gLenOffset+2+gLen]
+
+	if 2+pLen+2+gLen+2 > len(skx.key) {
+		return errServerKeyExchange
+	}
+	pubKeyLenOffset := 2 + gLenOffset + gLen
+	pubKeyLen := int(skx.key[pubKeyLenOffset])<<8 | int(skx.key[pubKeyLenOffset+1])
+
+	if 2+pLen+2+gLen+2+pubKeyLen > len(skx.key) {
+		return errServerKeyExchange
+	}
+	serverPubKey := skx.key[pubKeyLenOffset+2 : pubKeyLenOffset+2+pubKeyLen]
+
+	sig := skx.key[pubKeyLenOffset+2+pubKeyLen:]
+	if len(sig) < 2 {
+		return errServerKeyExchange
+	}
+
+	sigAndHash := signatureAndHash{signature: ka.sigType}
+	if ka.version >= VersionTLS12 {
+		// handle SignatureAndHashAlgorithm
+		sigAndHash = signatureAndHash{hash: sig[0], signature: sig[1]}
+		if sigAndHash.signature != ka.sigType {
+			return errServerKeyExchange
+		}
+		sig = sig[2:]
+		if len(sig) < 2 {
+			return errServerKeyExchange
+		}
+	}
+
+	sigLen := int(sig[0])<<8 | int(sig[1])
+	if sigLen+2 != len(sig) {
+		return errServerKeyExchange
+	}
+	sig = sig[2:]
+
+	lenServerDHParams := 2 + pLen + 2 + gLen + 2 + pubKeyLen
+	serverDHParams := make([]byte, lenServerDHParams)   // we know the exact size in advance
+	copy(serverDHParams, skx.key[:lenServerDHParams+1]) // everything in the skx up until the sig
+	digest, hashFunc, err := hashForServerKeyExchange(sigAndHash, ka.version, clientHello.random, serverHello.random, serverDHParams)
+	if err != nil {
+		return err
+	}
+
+	switch ka.sigType {
+	//case signatureECDSA: // TODO cut and paste from ECDHE?  Can't test it now.  Not even sure if possible
+	case signatureRSA:
+		pubKey, ok := cert.PublicKey.(*rsa.PublicKey)
+		if !ok {
+			return errors.New("tls: DHE RSA requires a RSA server public key")
+		}
+		if err := rsa.VerifyPKCS1v15(pubKey, hashFunc, digest, sig); err != nil {
+			return err
+		}
+	default:
+		return errors.New("tls: unknown DHE signature algorithm")
+	}
+
+	// store server's dh params in ka
+	ka.p = new(big.Int).SetBytes(serverP)
+	ka.g = new(big.Int).SetBytes(serverG)
+	ka.Ys = new(big.Int).SetBytes(serverPubKey)
+
+	return nil
+}
+
+var bigOne = big.NewInt(1)
+
+func (ka *dheKeyAgreement) generateClientKeyExchange(config *Config, clientHello *clientHelloMsg, cert *x509.Certificate) ([]byte, *clientKeyExchangeMsg, error) {
+	var preMasterSecret []byte
+
+	pMinus1 := new(big.Int).Sub(ka.p, bigOne)
+
+	// create a private key based on server's p and g
+	var x *big.Int
+	for {
+		var err error
+		if x, err = rand.Int(config.rand(), pMinus1); err != nil {
+			return nil, nil, err
+		}
+		if x.Sign() > 0 {
+			break
+		}
+	}
+
+	// create a public key and immediately get the bytes, since that's all we'll need
+	XBytes := new(big.Int).Exp(ka.g, x, ka.p).Bytes()
+	lenXBytes := len(XBytes)
+
+	// derive Z
+	// RFC 5346 8.1.2 The negotiated key (Z) is used as the pre_master_secret. Leading bytes of Z that
+	// contain all zero bits are stripped before it is used as the pre_master_secret.
+	if ka.Ys.Cmp(bigOne) <= 0 || ka.Ys.Cmp(pMinus1) >= 0 {
+		return nil, nil, errors.New("tls: Server DH parameter out of bounds")
+	}
+	preMasterSecret = new(big.Int).Exp(ka.Ys, x, ka.p).Bytes()
+
+	ckx := new(clientKeyExchangeMsg)
+	ckx.ciphertext = make([]byte, 2+lenXBytes)
+	ckx.ciphertext[0] = byte(lenXBytes >> 8)
+	ckx.ciphertext[1] = byte(lenXBytes)
+	copy(ckx.ciphertext[2:], XBytes)
 
 	return preMasterSecret, ckx, nil
 }

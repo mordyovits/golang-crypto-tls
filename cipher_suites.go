@@ -98,6 +98,14 @@ var cipherSuites = []*cipherSuite{
 	{TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA, 24, 20, 8, ecdheRSAKA, suiteECDHE, cipher3DES, macSHA1, nil},
 	{TLS_RSA_WITH_3DES_EDE_CBC_SHA, 24, 20, 8, rsaKA, 0, cipher3DES, macSHA1, nil},
 
+	// DHE PFS ciphersuites are disabled by default due to slowness
+	{TLS_DHE_RSA_WITH_AES_256_GCM_SHA384, 32, 0, 4, dheRSAKA, suiteTLS12 | suiteSHA384 | suiteDefaultOff, nil, nil, aeadAESGCM},
+	{TLS_DHE_RSA_WITH_AES_128_GCM_SHA256, 16, 0, 4, dheRSAKA, suiteDefaultOff, nil, nil, aeadAESGCM},
+	{TLS_DHE_RSA_WITH_AES_256_CBC_SHA256, 32, 32, 16, dheRSAKA, suiteDefaultOff, cipherAES, macSHA256, nil},
+	{TLS_DHE_RSA_WITH_AES_128_CBC_SHA256, 16, 32, 16, dheRSAKA, suiteDefaultOff, cipherAES, macSHA256, nil},
+	{TLS_DHE_RSA_WITH_AES_256_CBC_SHA, 32, 20, 16, dheRSAKA, suiteDefaultOff, cipherAES, macSHA1, nil},
+	{TLS_DHE_RSA_WITH_AES_128_CBC_SHA, 16, 20, 16, dheRSAKA, suiteDefaultOff, cipherAES, macSHA1, nil},
+
 	// RC4-based cipher suites are disabled by default.
 	{TLS_RSA_WITH_RC4_128_SHA, 16, 20, 0, rsaKA, suiteDefaultOff, cipherRC4, macSHA1, nil},
 	{TLS_ECDHE_RSA_WITH_RC4_128_SHA, 16, 20, 0, ecdheRSAKA, suiteECDHE | suiteDefaultOff, cipherRC4, macSHA1, nil},
@@ -345,6 +353,13 @@ func ecdheRSAKA(version uint16) keyAgreement {
 	}
 }
 
+func dheRSAKA(version uint16) keyAgreement {
+	return &dheKeyAgreement{
+		sigType: signatureRSA,
+		version: version,
+	}
+}
+
 // mutualCipherSuite returns a cipherSuite given a list of supported
 // ciphersuites and the id requested by the peer.
 func mutualCipherSuite(have []uint16, want uint16) *cipherSuite {
@@ -369,10 +384,16 @@ const (
 	TLS_RSA_WITH_RC4_128_SHA                uint16 = 0x0005
 	TLS_RSA_WITH_3DES_EDE_CBC_SHA           uint16 = 0x000a
 	TLS_RSA_WITH_AES_128_CBC_SHA            uint16 = 0x002f
+	TLS_DHE_RSA_WITH_AES_128_CBC_SHA        uint16 = 0x0033
 	TLS_RSA_WITH_AES_256_CBC_SHA            uint16 = 0x0035
+	TLS_DHE_RSA_WITH_AES_256_CBC_SHA        uint16 = 0x0039
 	TLS_RSA_WITH_AES_128_CBC_SHA256         uint16 = 0x003c
+	TLS_DHE_RSA_WITH_AES_128_CBC_SHA256     uint16 = 0x0067
+	TLS_DHE_RSA_WITH_AES_256_CBC_SHA256     uint16 = 0x006b
 	TLS_RSA_WITH_AES_128_GCM_SHA256         uint16 = 0x009c
 	TLS_RSA_WITH_AES_256_GCM_SHA384         uint16 = 0x009d
+	TLS_DHE_RSA_WITH_AES_128_GCM_SHA256     uint16 = 0x009e
+	TLS_DHE_RSA_WITH_AES_256_GCM_SHA384     uint16 = 0x009f
 	TLS_ECDHE_ECDSA_WITH_RC4_128_SHA        uint16 = 0xc007
 	TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA    uint16 = 0xc009
 	TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA    uint16 = 0xc00a

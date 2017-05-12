@@ -488,6 +488,10 @@ type Config struct {
 	// be used.
 	CurvePreferences []CurveID
 
+	// Diffie-Hellman parameters P and G
+	// Typically loaded from a dhparam.pem file
+	DhParamP, DhParamG *big.Int
+
 	// DynamicRecordSizingDisabled disables adaptive sizing of TLS records.
 	// When true, the largest possible TLS record size is always used. When
 	// false, the size of TLS records may be adjusted in an attempt to
@@ -580,6 +584,8 @@ func (c *Config) Clone() *Config {
 		MinVersion:                  c.MinVersion,
 		MaxVersion:                  c.MaxVersion,
 		CurvePreferences:            c.CurvePreferences,
+		DhParamP:                    c.DhParamP,
+		DhParamG:                    c.DhParamG,
 		DynamicRecordSizingDisabled: c.DynamicRecordSizingDisabled,
 		Renegotiation:               c.Renegotiation,
 		KeyLogWriter:                c.KeyLogWriter,

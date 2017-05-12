@@ -606,8 +606,8 @@ func (ka *dheKeyAgreement) processClientKeyExchange(config *Config, cert *Certif
 		return nil, errors.New("tls: Client DH parameter out of bounds")
 	}
 	preMasterSecret := new(big.Int).Exp(clientPubKey, ka.x, config.DhParamP).Bytes()
-	return preMasterSecret, nil
 
+	return preMasterSecret, nil
 }
 
 func (ka *dheKeyAgreement) processServerKeyExchange(config *Config, clientHello *clientHelloMsg, serverHello *serverHelloMsg, cert *x509.Certificate, skx *serverKeyExchangeMsg) error {

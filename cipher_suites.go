@@ -373,7 +373,7 @@ func dheRSAKA(version uint16) keyAgreement {
 }
 
 func pskKA(version uint16) keyAgreement {
-	return pskKeyAgreement{}
+	return &pskKeyAgreement{}
 }
 
 // mutualCipherSuite returns a cipherSuite given a list of supported

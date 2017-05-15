@@ -17,6 +17,7 @@ import (
 	"errors"
 	"io"
 	"math/big"
+	"fmt"
 
 	"golang_org/x/crypto/curve25519"
 )
@@ -473,22 +474,53 @@ func (ka *ecdheKeyAgreement) generateClientKeyExchange(config *Config, clientHel
 	return preMasterSecret, ckx, nil
 }
 
-type pskKeyAgreement struct{}
+type pskKeyAgreement struct{
+	identityHint []byte	// provided by serrver and stashed by client
+}
 
-func (ka pskKeyAgreement) generateServerKeyExchange(config *Config, cert *Certificate, clientHello *clientHelloMsg, hello *serverHelloMsg) (*serverKeyExchangeMsg, error) {
+func (ka *pskKeyAgreement) generateServerKeyExchange(config *Config, cert *Certificate, clientHello *clientHelloMsg, hello *serverHelloMsg) (*serverKeyExchangeMsg, error) {
 	return nil, nil
 }
 
-func (ka pskKeyAgreement) processClientKeyExchange(config *Config, cert *Certificate, ckx *clientKeyExchangeMsg, version uint16) ([]byte, error) {
+func (ka *pskKeyAgreement) processClientKeyExchange(config *Config, cert *Certificate, ckx *clientKeyExchangeMsg, version uint16) ([]byte, error) {
 	return nil, nil
 }
 
-func (ka pskKeyAgreement) processServerKeyExchange(config *Config, clientHello *clientHelloMsg, serverHello *serverHelloMsg, cert *x509.Certificate, skx *serverKeyExchangeMsg) error {
+func (ka *pskKeyAgreement) processServerKeyExchange(config *Config, clientHello *clientHelloMsg, serverHello *serverHelloMsg, cert *x509.Certificate, skx *serverKeyExchangeMsg) error {
+	// per RFC 4279 server can send a "identity hint", so stash it in the ka
+	if len(skx.key) < 2 {
+		return errServerKeyExchange
+	}
+	hintLen := int(skx.key[0])<<8 | int(skx.key[1])
+	if 2+hintLen > len(skx.key) {
+		return errServerKeyExchange
+	}
+	ka.identityHint = skx.key[2:hintLen+2]
+	fmt.Println(ka.identityHint)
 	return nil
 }
 
-func (ka pskKeyAgreement) generateClientKeyExchange(config *Config, clientHello *clientHelloMsg, cert *x509.Certificate) ([]byte, *clientKeyExchangeMsg, error) {
-	return nil, nil, nil
+func (ka *pskKeyAgreement) generateClientKeyExchange(config *Config, clientHello *clientHelloMsg, cert *x509.Certificate) ([]byte, *clientKeyExchangeMsg, error) {
+	psk := []byte{0x00, 0x01, 0x02} // hard coded for dev
+	lenPsk := len(psk)
+
+	identity := []byte("Client_identity")
+	lenIdentity := len(identity)
+
+	ckx := new(clientKeyExchangeMsg)
+	ckx.ciphertext = make([]byte, 2+lenIdentity)
+	ckx.ciphertext[0] = byte(lenIdentity >> 8)
+	ckx.ciphertext[1] = byte(lenIdentity)
+	copy(ckx.ciphertext[2:], identity)
+
+	preMasterSecret := make([]byte, 2*lenPsk+4) // RFC4279 specifies an null-filled other_secret of the same length as PSK
+	preMasterSecret[0] = byte(lenPsk >> 8)
+	preMasterSecret[1] = byte(lenPsk)
+	preMasterSecret[lenPsk+2] = preMasterSecret[0] // the actual PSK begins here
+	preMasterSecret[lenPsk+3] = preMasterSecret[1]
+	copy(preMasterSecret[lenPsk+4:], psk)
+
+	return preMasterSecret, ckx, nil
 }
 
 type dheKeyAgreement struct {

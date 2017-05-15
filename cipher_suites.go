@@ -48,6 +48,8 @@ const (
 	// certificate is ECDSA. If this is not set then the cipher suite is
 	// RSA based.
 	suiteECDSA
+	// suitePSK indisates that the cipher suite uses a pre-shared key
+	suitePSK
 	// suiteDHE indicates that the cipher suite involves Diffie-Hellman. This
 	// means that a server should only use it if there's configured DH
 	// parameters.
@@ -101,6 +103,10 @@ var cipherSuites = []*cipherSuite{
 	{TLS_RSA_WITH_AES_256_CBC_SHA, 32, 20, 16, rsaKA, 0, cipherAES, macSHA1, nil},
 	{TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA, 24, 20, 8, ecdheRSAKA, suiteECDHE, cipher3DES, macSHA1, nil},
 	{TLS_RSA_WITH_3DES_EDE_CBC_SHA, 24, 20, 8, rsaKA, 0, cipher3DES, macSHA1, nil},
+
+	// PSK ciphersuites use only symmetric ciphers
+	{TLS_PSK_WITH_AES_128_CBC_SHA, 16, 20, 16, pskKA, suitePSK | suiteDefaultOff, cipherAES, macSHA1, nil},
+	{TLS_PSK_WITH_AES_256_CBC_SHA, 32, 20, 16, pskKA, suitePSK | suiteDefaultOff, cipherAES, macSHA1, nil},
 
 	// DHE PFS ciphersuites are disabled by default due to slowness
 	{TLS_DHE_RSA_WITH_AES_256_GCM_SHA384, 32, 0, 4, dheRSAKA, suiteDHE | suiteTLS12 | suiteSHA384 | suiteDefaultOff, nil, nil, aeadAESGCM},
@@ -364,6 +370,10 @@ func dheRSAKA(version uint16) keyAgreement {
 		sigType: signatureRSA,
 		version: version,
 	}
+}
+
+func pskKA(version uint16) keyAgreement {
+	return pskKeyAgreement{}
 }
 
 // mutualCipherSuite returns a cipherSuite given a list of supported

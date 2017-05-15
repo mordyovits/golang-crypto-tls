@@ -473,6 +473,24 @@ func (ka *ecdheKeyAgreement) generateClientKeyExchange(config *Config, clientHel
 	return preMasterSecret, ckx, nil
 }
 
+type pskKeyAgreement struct{}
+
+func (ka pskKeyAgreement) generateServerKeyExchange(config *Config, cert *Certificate, clientHello *clientHelloMsg, hello *serverHelloMsg) (*serverKeyExchangeMsg, error) {
+	return nil, nil
+}
+
+func (ka pskKeyAgreement) processClientKeyExchange(config *Config, cert *Certificate, ckx *clientKeyExchangeMsg, version uint16) ([]byte, error) {
+	return nil, nil
+}
+
+func (ka pskKeyAgreement) processServerKeyExchange(config *Config, clientHello *clientHelloMsg, serverHello *serverHelloMsg, cert *x509.Certificate, skx *serverKeyExchangeMsg) error {
+	return nil
+}
+
+func (ka pskKeyAgreement) generateClientKeyExchange(config *Config, clientHello *clientHelloMsg, cert *x509.Certificate) ([]byte, *clientKeyExchangeMsg, error) {
+	return nil, nil, nil
+}
+
 type dheKeyAgreement struct {
 	version uint16
 	sigType uint8

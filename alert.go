@@ -38,6 +38,7 @@ const (
 	alertInappropriateFallback  alert = 86
 	alertUserCanceled           alert = 90
 	alertNoRenegotiation        alert = 100
+	alertUnknownPSKIdentity     alert = 115
 	alertNoApplicationProtocol  alert = 120
 )
 
@@ -65,6 +66,7 @@ var alertText = map[alert]string{
 	alertInappropriateFallback:  "inappropriate fallback",
 	alertUserCanceled:           "user canceled",
 	alertNoRenegotiation:        "no renegotiation",
+	alertUnknownPSKIdentity:     "unknown PSK identity",
 	alertNoApplicationProtocol:  "no application protocol",
 }
 

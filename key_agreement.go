@@ -17,7 +17,6 @@ import (
 	"errors"
 	"io"
 	"math/big"
-	"fmt"
 
 	"golang_org/x/crypto/curve25519"
 )
@@ -474,8 +473,8 @@ func (ka *ecdheKeyAgreement) generateClientKeyExchange(config *Config, clientHel
 	return preMasterSecret, ckx, nil
 }
 
-type pskKeyAgreement struct{
-	identityHint []byte	// provided by serrver and stashed by client
+type pskKeyAgreement struct {
+	identityHint []byte // provided by serrver and stashed by client
 }
 
 func (ka *pskKeyAgreement) generateServerKeyExchange(config *Config, cert *Certificate, clientHello *clientHelloMsg, hello *serverHelloMsg) (*serverKeyExchangeMsg, error) {
@@ -495,17 +494,26 @@ func (ka *pskKeyAgreement) processServerKeyExchange(config *Config, clientHello 
 	if 2+hintLen > len(skx.key) {
 		return errServerKeyExchange
 	}
-	ka.identityHint = skx.key[2:hintLen+2]
-	fmt.Println(ka.identityHint)
+	ka.identityHint = skx.key[2 : hintLen+2]
 	return nil
 }
 
 func (ka *pskKeyAgreement) generateClientKeyExchange(config *Config, clientHello *clientHelloMsg, cert *x509.Certificate) ([]byte, *clientKeyExchangeMsg, error) {
-	psk := []byte{0x00, 0x01, 0x02} // hard coded for dev
-	lenPsk := len(psk)
+	if config.GetPSKIdentity == nil || config.GetPSKKey == nil {
+		return nil, nil, errors.New("tls: missing psk functions in config")
+	}
 
-	identity := []byte("Client_identity")
+	identity, err := config.GetPSKIdentity()
+	if err != nil {
+		return nil, nil, err
+	}
 	lenIdentity := len(identity)
+
+	psk, err := config.GetPSKKey(identity)
+	if err != nil {
+		return nil, nil, err
+	}
+	lenPsk := len(psk)
 
 	ckx := new(clientKeyExchangeMsg)
 	ckx.ciphertext = make([]byte, 2+lenIdentity)

@@ -422,6 +422,11 @@ type Config struct {
 	// the verifiedChains argument will always be nil.
 	VerifyPeerCertificate func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error
 
+	// PSK funcs
+	GetPSKIdentityHint func() ([]byte, error)
+	GetPSKIdentity     func() (string, error) // RFC 4279 5.1 insists the identity is utf8
+	GetPSKKey          func(identity string) ([]byte, error)
+
 	// RootCAs defines the set of root certificate authorities
 	// that clients use when verifying server certificates.
 	// If RootCAs is nil, TLS uses the host's root CA set.
@@ -577,6 +582,9 @@ func (c *Config) Clone() *Config {
 		GetClientCertificate:        c.GetClientCertificate,
 		GetConfigForClient:          c.GetConfigForClient,
 		VerifyPeerCertificate:       c.VerifyPeerCertificate,
+		GetPSKIdentityHint:          c.GetPSKIdentityHint,
+		GetPSKIdentity:              c.GetPSKIdentity,
+		GetPSKKey:                   c.GetPSKKey,
 		RootCAs:                     c.RootCAs,
 		NextProtos:                  c.NextProtos,
 		ServerName:                  c.ServerName,

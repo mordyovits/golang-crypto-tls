@@ -217,6 +217,38 @@ Curves:
 		}
 	}
 
+	hs.cert, err = c.config.getCertificate(hs.clientHelloInfo())
+	if err != nil {
+		c.sendAlert(alertInternalError)
+		return false, err
+	}
+	if hs.cert != nil {
+		if hs.clientHello.scts {
+			hs.hello.scts = hs.cert.SignedCertificateTimestamps
+		}
+
+		if priv, ok := hs.cert.PrivateKey.(crypto.Signer); ok {
+			switch priv.Public().(type) {
+			case *ecdsa.PublicKey:
+				hs.ecdsaOk = true
+			case *rsa.PublicKey:
+				hs.rsaSignOk = true
+			default:
+				c.sendAlert(alertInternalError)
+				return false, fmt.Errorf("tls: unsupported signing key type (%T)", priv.Public())
+			}
+		}
+		if priv, ok := hs.cert.PrivateKey.(crypto.Decrypter); ok {
+			switch priv.Public().(type) {
+			case *rsa.PublicKey:
+				hs.rsaDecryptOk = true
+			default:
+				c.sendAlert(alertInternalError)
+				return false, fmt.Errorf("tls: unsupported decryption key type (%T)", priv.Public())
+			}
+		}
+	}
+
 	var preferenceList, supportedList []uint16
 	if c.config.PreferServerCipherSuites {
 		preferenceList = c.config.cipherSuites()
@@ -246,38 +278,6 @@ Curves:
 				return false, errors.New("tls: client using inappropriate protocol fallback")
 			}
 			break
-		}
-	}
-
-	if hs.suite.flags&suiteNoCerts == 0 { // skip getting cert if ciphersuite doesn't use certs
-		hs.cert, err = c.config.getCertificate(hs.clientHelloInfo())
-		if err != nil {
-			c.sendAlert(alertInternalError)
-			return false, err
-		}
-		if hs.clientHello.scts {
-			hs.hello.scts = hs.cert.SignedCertificateTimestamps
-		}
-
-		if priv, ok := hs.cert.PrivateKey.(crypto.Signer); ok {
-			switch priv.Public().(type) {
-			case *ecdsa.PublicKey:
-				hs.ecdsaOk = true
-			case *rsa.PublicKey:
-				hs.rsaSignOk = true
-			default:
-				c.sendAlert(alertInternalError)
-				return false, fmt.Errorf("tls: unsupported signing key type (%T)", priv.Public())
-			}
-		}
-		if priv, ok := hs.cert.PrivateKey.(crypto.Decrypter); ok {
-			switch priv.Public().(type) {
-			case *rsa.PublicKey:
-				hs.rsaDecryptOk = true
-			default:
-				c.sendAlert(alertInternalError)
-				return false, fmt.Errorf("tls: unsupported decryption key type (%T)", priv.Public())
-			}
 		}
 	}
 
@@ -366,7 +366,7 @@ func (hs *serverHandshakeState) doResumeHandshake() error {
 func (hs *serverHandshakeState) doFullHandshake() error {
 	c := hs.c
 
-	if hs.clientHello.ocspStapling && len(hs.cert.OCSPStaple) > 0 {
+	if hs.cert != nil && hs.clientHello.ocspStapling && len(hs.cert.OCSPStaple) > 0 {
 		hs.hello.ocspStapling = true
 	}
 
@@ -387,7 +387,6 @@ func (hs *serverHandshakeState) doFullHandshake() error {
 
 	certMsg := new(certificateMsg)
 	if hs.suite.flags&suiteNoCerts == 0 {
-		// TODO check if hs.cert is nil?
 		certMsg.certificates = hs.cert.Certificate
 		hs.finishedHash.Write(certMsg.marshal())
 		if _, err := c.writeRecord(recordTypeHandshake, certMsg.marshal()); err != nil {

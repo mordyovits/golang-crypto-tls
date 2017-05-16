@@ -17,6 +17,7 @@ import (
 	"errors"
 	"io"
 	"math/big"
+	"unicode/utf8"
 
 	"golang_org/x/crypto/curve25519"
 )
@@ -478,11 +479,63 @@ type pskKeyAgreement struct {
 }
 
 func (ka *pskKeyAgreement) generateServerKeyExchange(config *Config, cert *Certificate, clientHello *clientHelloMsg, hello *serverHelloMsg) (*serverKeyExchangeMsg, error) {
-	return nil, nil
+	if config.GetPSKIdentityHint == nil {
+		return nil, nil
+	}
+
+	hint, err := config.GetPSKIdentityHint() // TODO what should be args to gethint()?
+	if err != nil {
+		return nil, err
+	}
+
+	if hint == nil {
+		return nil, nil
+	}
+
+	skx := new(serverKeyExchangeMsg)
+	skx.key = make([]byte, 2+len(hint))
+	skx.key[0] = byte(len(hint) >> 8)
+	skx.key[1] = byte(len(hint))
+	copy(skx.key[2:], hint)
+
+	return skx, nil
 }
 
 func (ka *pskKeyAgreement) processClientKeyExchange(config *Config, cert *Certificate, ckx *clientKeyExchangeMsg, version uint16) ([]byte, error) {
-	return nil, nil
+	if config.GetPSKKey == nil {
+		return nil, errors.New("tls: missing PSK key function")
+	}
+	if len(ckx.ciphertext) < 2 {
+		return nil, errClientKeyExchange
+	}
+	identityLen := int(ckx.ciphertext[0])<<8 | int(ckx.ciphertext[1])
+
+	if len(ckx.ciphertext) != 2+identityLen {
+		return nil, errClientKeyExchange
+	}
+
+	identityBytes := ckx.ciphertext[2:]
+
+	// RFC 4279 5.1 says it MUST be utf8
+	if !utf8.Valid(identityBytes) {
+		return nil, errors.New("tls: received invalid PSK identity")
+	}
+
+	psk, err := config.GetPSKKey(string(identityBytes))
+	if err != nil {
+		return nil, err
+	}
+	lenPsk := len(psk)
+	// TODO here is where you'd alert unknown identity
+
+	preMasterSecret := make([]byte, 2*lenPsk+4) // RFC4279 specifies an null-filled other_secret of the same length as PSK
+	preMasterSecret[0] = byte(lenPsk >> 8)
+	preMasterSecret[1] = byte(lenPsk)
+	preMasterSecret[lenPsk+2] = preMasterSecret[0] // the actual PSK begins here
+	preMasterSecret[lenPsk+3] = preMasterSecret[1]
+	copy(preMasterSecret[lenPsk+4:], psk)
+
+	return preMasterSecret, nil
 }
 
 func (ka *pskKeyAgreement) processServerKeyExchange(config *Config, clientHello *clientHelloMsg, serverHello *serverHelloMsg, cert *x509.Certificate, skx *serverKeyExchangeMsg) error {

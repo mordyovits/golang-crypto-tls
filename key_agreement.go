@@ -526,7 +526,7 @@ func (ka *pskKeyAgreement) processClientKeyExchange(config *Config, cert *Certif
 		return nil, err
 	}
 	lenPsk := len(psk)
-	// TODO here is where you'd alert unknown identity
+	// TODO(movits) here is where you'd alert unknown identity
 
 	preMasterSecret := make([]byte, 2*lenPsk+4) // RFC4279 specifies an null-filled other_secret of the same length as PSK
 	preMasterSecret[0] = byte(lenPsk >> 8)
@@ -556,7 +556,7 @@ func (ka *pskKeyAgreement) generateClientKeyExchange(config *Config, clientHello
 		return nil, nil, errors.New("tls: missing psk functions in config")
 	}
 
-	identity, err := config.GetPSKIdentity()
+	identity, err := config.GetPSKIdentity(ka.identityHint)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -421,9 +421,14 @@ type Config struct {
 	// the verifiedChains argument will always be nil.
 	VerifyPeerCertificate func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error
 
-	// PSK funcs
+	// PSK Server Function to provide a hint to the client about which identity
+	// the client should send. If the hint retruned is nil, the ServerKeyExchange
+	// is skipped, as per RFC 4297 Section 2.
 	GetPSKIdentityHint func() ([]byte, error)
-	GetPSKIdentity     func() (string, error) // RFC 4279 5.1 insists the identity is utf8
+	// PSK Client Function to choose the identity to send to the server
+	// RFC 4279 5.1 insists the identity is utf8
+	GetPSKIdentity     func(identityHint []byte) (string, error)
+	// PSK function used by the client and the server to get the PSK
 	GetPSKKey          func(identity string) ([]byte, error)
 
 	// RootCAs defines the set of root certificate authorities

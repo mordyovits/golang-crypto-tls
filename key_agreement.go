@@ -584,12 +584,16 @@ func (ka *pskKeyAgreement) generateClientKeyExchange(config *Config, clientHello
 	return preMasterSecret, ckx, nil
 }
 
+type serverDheParams struct {
+	dhp DhParams // Server's dh params
+	Ys  *big.Int // Server's pubkey
+}
+
 type dheKeyAgreement struct {
 	version uint16
 	sigType uint8
 	// stuff stored in ka by client
-	dhp DhParams // Server's dh params
-	Ys  *big.Int // Server's pubkey
+	serverDheParams
 	// stuff stored in ka by server
 	x *big.Int // Server's private key
 }
@@ -859,4 +863,144 @@ func (ka *dheKeyAgreement) generateClientKeyExchange(config *Config, clientHello
 	copy(ckx.ciphertext[2:], XBytes)
 
 	return preMasterSecret, ckx, nil
+}
+
+type dhePskKeyAgreement struct {
+	pskKeyAgreement
+	serverDheParams
+	// stuff stored in ka by server
+	x *big.Int // Server's private key
+}
+
+func (ka *dhePskKeyAgreement) generateServerKeyExchange(config *Config, cert *Certificate, clientHello *clientHelloMsg, hello *serverHelloMsg) (*serverKeyExchangeMsg, error) {
+	// Shouldn't possible for a DHE ciphersuite to have been chosen by a server with a nil
+	// DhParameters, but extra care
+	if config.DhParameters == nil {
+		return nil, errors.New("tls: config is missing Diffie-Hellman parameters needed for DHE ciphersuite")
+	}
+
+	var hint []byte
+	if config.GetPSKIdentityHint == nil {
+		hint = []byte{}
+	} else {
+		hint, err := config.GetPSKIdentityHint() // TODO what should be args to gethint()?
+		if err != nil {
+			return nil, err
+		}
+		if hint == nil {
+			hint = []byte{}
+		}
+	}
+
+	pBytes := config.DhParameters.P.Bytes()
+	lenPBytes := len(pBytes)
+	gBytes := config.DhParameters.G.Bytes()
+	lenGBytes := len(gBytes)
+
+	// create a private key based on p and g
+	pMinus1 := new(big.Int).Sub(config.DhParameters.P, bigOne)
+	for {
+		var err error
+		if ka.x, err = rand.Int(config.rand(), pMinus1); err != nil {
+			return nil, err
+		}
+		if ka.x.Sign() > 0 {
+			break
+		}
+	}
+
+	// create a public key
+	pubKey := new(big.Int).Exp(config.DhParameters.G, ka.x, config.DhParameters.P)
+	pubKeyBytes := pubKey.Bytes()
+	lenPubKeyBytes := len(pubKeyBytes)
+
+	lenServerDHParams := 2 + lenPBytes + 2 + lenGBytes + 2 + lenPubKeyBytes
+	serverDHParams := make([]byte, lenServerDHParams)
+
+	serverDHParams[0] = byte(lenPBytes >> 8)
+	serverDHParams[1] = byte(lenPBytes)
+	copy(serverDHParams[2:], pBytes)
+
+	gLenOffset := 2 + lenPBytes
+	serverDHParams[gLenOffset] = byte(lenGBytes >> 8)
+	serverDHParams[gLenOffset+1] = byte(lenGBytes)
+	copy(serverDHParams[gLenOffset+2:], gBytes)
+
+	pubKeyLenOffset := gLenOffset + 2 + lenGBytes
+	serverDHParams[pubKeyLenOffset] = byte(lenPubKeyBytes >> 8)
+	serverDHParams[pubKeyLenOffset+1] = byte(lenPubKeyBytes)
+	copy(serverDHParams[pubKeyLenOffset+2:], pubKeyBytes)
+
+	skx := new(serverKeyExchangeMsg)
+	skx.key = make([]byte, 2+len(hint)+lenServerDHParams)
+	skx.key[0] = byte(len(hint) >> 8)
+	skx.key[1] = byte(len(hint))
+	copy(skx.key[2:], hint)
+	copy(skx.key[2+len(hint):], serverDHParams)
+
+	return skx, nil
+}
+
+func (ka *dhePskKeyAgreement) processClientKeyExchange(config *Config, cert *Certificate, ckx *clientKeyExchangeMsg, version uint16) ([]byte, error) {
+	if config.GetPSKKey == nil {
+		return nil, errors.New("tls: missing PSK key function")
+	}
+	if len(ckx.ciphertext) < 2 {
+		return nil, errClientKeyExchange
+	}
+	identityLen := int(ckx.ciphertext[0])<<8 | int(ckx.ciphertext[1])
+
+	identityBytes := ckx.ciphertext[2 : identityLen+3]
+	fmt.Println(identityBytes)
+
+	// RFC 4279 5.1 says it MUST be utf8
+	if !utf8.Valid(identityBytes) {
+		return nil, errors.New("tls: received invalid PSK identity")
+	}
+
+	psk, err := config.GetPSKKey(string(identityBytes))
+	if err != nil {
+		return nil, err
+	}
+	lenPsk := len(psk)
+	// TODO(movits) here is where you'd alert unknown identity
+
+	cpkOffset := identityLen + 2
+	clientPubKeyLen := int(ckx.ciphertext[cpkOffset])<<8 | int(ckx.ciphertext[cpkOffset+1])
+
+	if len(ckx.ciphertext) != 2+identityLen+2+clientPubKeyLen {
+		return nil, errClientKeyExchange
+	}
+
+	clientPubKey := new(big.Int).SetBytes(ckx.ciphertext[cpkOffset+2:])
+
+	pMinus1 := new(big.Int).Sub(config.DhParameters.P, bigOne)
+
+	if clientPubKey.Cmp(bigOne) <= 0 || clientPubKey.Cmp(pMinus1) >= 0 {
+		return nil, errors.New("tls: Client DH parameter out of bounds")
+	}
+	ZBytes := new(big.Int).Exp(clientPubKey, ka.x, config.DhParameters.P).Bytes()
+	lenZBytes := len(ZBytes)
+
+	preMasterSecret := make([]byte, 2+lenZBytes+2+lenPsk)
+	preMasterSecret[0] = byte(lenZBytes >> 8)
+	preMasterSecret[1] = byte(lenZBytes)
+	copy(preMasterSecret[2:], ZBytes)
+	preMasterSecret[lenZBytes+2] = byte(lenPsk >> 8)
+	preMasterSecret[lenZBytes+3] = byte(lenPsk)
+	copy(preMasterSecret[lenZBytes+4:], psk)
+
+	return preMasterSecret, nil
+}
+
+func (ka *dhePskKeyAgreement) processServerKeyExchange(config *Config, clientHello *clientHelloMsg, serverHello *serverHelloMsg, cert *x509.Certificate, skx *serverKeyExchangeMsg) error {
+	// parse out the identity hint
+	// parse out the dhparams
+	// validate dparams
+
+	return nil
+}
+
+func (ka *dhePskKeyAgreement) generateClientKeyExchange(config *Config, clientHello *clientHelloMsg, cert *x509.Certificate) ([]byte, *clientKeyExchangeMsg, error) {
+	return nil, nil, nil
 }

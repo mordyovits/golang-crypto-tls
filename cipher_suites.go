@@ -119,7 +119,10 @@ var cipherSuites = []*cipherSuite{
 	// PSK ciphersuites use preshared keys
 	{TLS_PSK_WITH_AES_128_CBC_SHA, 16, 20, 16, pskKA, suiteNoCerts | suiteDefaultOff, cipherAES, macSHA1, nil},
 	{TLS_PSK_WITH_AES_256_CBC_SHA, 32, 20, 16, pskKA, suiteNoCerts | suiteDefaultOff, cipherAES, macSHA1, nil},
+	// DHE_PSK
+	//{TLS_DHE_PSK_WITH_AES_256_CBC_SHA384
 	{TLS_DHE_PSK_WITH_AES_256_CBC_SHA, 32, 20, 16, dhePSKKA, suiteDHE | suiteNoCerts | suiteDefaultOff, cipherAES, macSHA1, nil},
+	{TLS_DHE_PSK_WITH_AES_128_CBC_SHA256, 16, 32, 16, dhePSKKA, suiteDHE | suiteNoCerts | suiteDefaultOff, cipherAES, macSHA256, nil},
 	{TLS_DHE_PSK_WITH_AES_128_CBC_SHA, 16, 20, 16, dhePSKKA, suiteDHE | suiteNoCerts | suiteDefaultOff, cipherAES, macSHA1, nil},
 
 	// RC4-based cipher suites are disabled by default.
@@ -424,6 +427,7 @@ const (
 	TLS_RSA_WITH_AES_256_GCM_SHA384         uint16 = 0x009d
 	TLS_DHE_RSA_WITH_AES_128_GCM_SHA256     uint16 = 0x009e
 	TLS_DHE_RSA_WITH_AES_256_GCM_SHA384     uint16 = 0x009f
+	TLS_DHE_PSK_WITH_AES_128_CBC_SHA256     uint16 = 0x00b2
 	TLS_ECDHE_ECDSA_WITH_RC4_128_SHA        uint16 = 0xc007
 	TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA    uint16 = 0xc009
 	TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA    uint16 = 0xc00a

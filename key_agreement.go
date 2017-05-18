@@ -474,6 +474,19 @@ func (ka *ecdheKeyAgreement) generateClientKeyExchange(config *Config, clientHel
 	return preMasterSecret, ckx, nil
 }
 
+// returns chunk, rest, error
+func parseUint16Chunk(data []byte) ([]byte, []byte, error) {
+	if len(data) < 2 {
+		return nil, nil, errors.New("chunk data invalid")
+	}
+	length := int(data[0])<<8 | int(data[1])
+	if len(data) < 2+length {
+		return nil, nil, errors.New("chunk data invalid")
+	}
+	chunk := data[2 : 2+length]
+	return chunk, data[2+length:], nil
+}
+
 type pskKeyAgreement struct {
 	identityHint []byte // provided by serrver and stashed by client
 }
@@ -505,16 +518,11 @@ func (ka *pskKeyAgreement) processClientKeyExchange(config *Config, cert *Certif
 	if config.GetPSKKey == nil {
 		return nil, errors.New("tls: missing PSK key function")
 	}
-	if len(ckx.ciphertext) < 2 {
+
+	identityBytes, rest, err := parseUint16Chunk(ckx.ciphertext)
+	if err != nil || len(rest) != 0 {
 		return nil, errClientKeyExchange
 	}
-	identityLen := int(ckx.ciphertext[0])<<8 | int(ckx.ciphertext[1])
-
-	if len(ckx.ciphertext) != 2+identityLen {
-		return nil, errClientKeyExchange
-	}
-
-	identityBytes := ckx.ciphertext[2:]
 
 	// RFC 4279 5.1 says it MUST be utf8
 	if !utf8.Valid(identityBytes) {
@@ -939,19 +947,6 @@ func (ka *dhePskKeyAgreement) generateServerKeyExchange(config *Config, cert *Ce
 	copy(skx.key[2+len(hint):], serverDHParams)
 
 	return skx, nil
-}
-
-// returns chunk, rest, error
-func parseUint16Chunk(data []byte) ([]byte, []byte, error) {
-	if len(data) < 2 {
-		return nil, nil, errors.New("chunk data invalid")
-	}
-	length := int(data[0])<<8 | int(data[1])
-	if len(data) < 2+length {
-		return nil, nil, errors.New("chunk data invalid")
-	}
-	chunk := data[2 : 2+length]
-	return chunk, data[2+length:], nil
 }
 
 func (ka *dhePskKeyAgreement) processClientKeyExchange(config *Config, cert *Certificate, ckx *clientKeyExchangeMsg, version uint16) ([]byte, error) {

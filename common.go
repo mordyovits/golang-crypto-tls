@@ -11,7 +11,6 @@ import (
 	"crypto/rand"
 	"crypto/sha512"
 	"crypto/x509"
-	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -422,6 +421,16 @@ type Config struct {
 	// the verifiedChains argument will always be nil.
 	VerifyPeerCertificate func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error
 
+	// PSK Server Function to provide a hint to the client about which identity
+	// the client should send. If the hint retruned is nil, the ServerKeyExchange
+	// is skipped, as per RFC 4297 Section 2.
+	GetPSKIdentityHint func() ([]byte, error)
+	// PSK Client Function to choose the identity to send to the server
+	// RFC 4279 5.1 insists the identity is utf8
+	GetPSKIdentity     func(identityHint []byte) (string, error)
+	// PSK function used by the client and the server to get the PSK
+	GetPSKKey          func(identity string) ([]byte, error)
+
 	// RootCAs defines the set of root certificate authorities
 	// that clients use when verifying server certificates.
 	// If RootCAs is nil, TLS uses the host's root CA set.
@@ -577,6 +586,9 @@ func (c *Config) Clone() *Config {
 		GetClientCertificate:        c.GetClientCertificate,
 		GetConfigForClient:          c.GetConfigForClient,
 		VerifyPeerCertificate:       c.VerifyPeerCertificate,
+		GetPSKIdentityHint:          c.GetPSKIdentityHint,
+		GetPSKIdentity:              c.GetPSKIdentity,
+		GetPSKKey:                   c.GetPSKKey,
 		RootCAs:                     c.RootCAs,
 		NextProtos:                  c.NextProtos,
 		ServerName:                  c.ServerName,
@@ -739,7 +751,7 @@ func (c *Config) getCertificate(clientHello *ClientHelloInfo) (*Certificate, err
 	}
 
 	if len(c.Certificates) == 0 {
-		return nil, errors.New("tls: no certificates configured")
+		return nil, nil
 	}
 
 	if len(c.Certificates) == 1 || c.NameToCertificate == nil {

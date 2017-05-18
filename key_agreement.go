@@ -716,16 +716,11 @@ func (ka *dheKeyAgreement) generateServerKeyExchange(config *Config, cert *Certi
 }
 
 func (ka *dheKeyAgreement) processClientKeyExchange(config *Config, cert *Certificate, ckx *clientKeyExchangeMsg, version uint16) ([]byte, error) {
-	if len(ckx.ciphertext) < 2 {
+	clientPubKeyBytes, rest, err := parseUint16Chunk(ckx.ciphertext)
+	if err != nil || len(rest) != 0 {
 		return nil, errClientKeyExchange
 	}
-	clientPubKeyLen := int(ckx.ciphertext[0])<<8 | int(ckx.ciphertext[1])
-
-	if len(ckx.ciphertext) != 2+clientPubKeyLen {
-		return nil, errClientKeyExchange
-	}
-
-	clientPubKey := new(big.Int).SetBytes(ckx.ciphertext[2:])
+	clientPubKey := new(big.Int).SetBytes(clientPubKeyBytes)
 
 	pMinus1 := new(big.Int).Sub(config.DhParameters.P, bigOne)
 

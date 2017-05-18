@@ -548,14 +548,12 @@ func (ka *pskKeyAgreement) processClientKeyExchange(config *Config, cert *Certif
 
 func (ka *pskKeyAgreement) processServerKeyExchange(config *Config, clientHello *clientHelloMsg, serverHello *serverHelloMsg, cert *x509.Certificate, skx *serverKeyExchangeMsg) error {
 	// per RFC 4279 server can send a "identity hint", so stash it in the ka
-	if len(skx.key) < 2 {
+	hint, rest, err := parseUint16Chunk(skx.key)
+	if err != nil || len(rest) != 0 {
 		return errServerKeyExchange
 	}
-	hintLen := int(skx.key[0])<<8 | int(skx.key[1])
-	if 2+hintLen > len(skx.key) {
-		return errServerKeyExchange
-	}
-	ka.identityHint = skx.key[2 : hintLen+2]
+	ka.identityHint = hint
+
 	return nil
 }
 

@@ -733,39 +733,19 @@ func (ka *dheKeyAgreement) processClientKeyExchange(config *Config, cert *Certif
 }
 
 func (ka *dheKeyAgreement) processServerKeyExchange(config *Config, clientHello *clientHelloMsg, serverHello *serverHelloMsg, cert *x509.Certificate, skx *serverKeyExchangeMsg) error {
-	if len(skx.key) < 2 {
+	serverP, rest, err := parseUint16Chunk(skx.key)
+	if err != nil {
 		return errServerKeyExchange
 	}
-	pLen := int(skx.key[0])<<8 | int(skx.key[1])
-
-	if 2+pLen > len(skx.key) {
+	serverG, rest, err := parseUint16Chunk(rest)
+	if err != nil {
 		return errServerKeyExchange
 	}
-	serverP := skx.key[2 : pLen+2]
-
-	if 2+pLen+2 > len(skx.key) {
+	serverPubKey, sig, err := parseUint16Chunk(rest)
+	if err != nil {
 		return errServerKeyExchange
 	}
-	gLenOffset := 2 + pLen
-	gLen := int(skx.key[gLenOffset])<<8 | int(skx.key[gLenOffset+1])
 
-	if 2+pLen+2+gLen > len(skx.key) {
-		return errServerKeyExchange
-	}
-	serverG := skx.key[gLenOffset+2 : gLenOffset+2+gLen]
-
-	if 2+pLen+2+gLen+2 > len(skx.key) {
-		return errServerKeyExchange
-	}
-	pubKeyLenOffset := 2 + gLenOffset + gLen
-	pubKeyLen := int(skx.key[pubKeyLenOffset])<<8 | int(skx.key[pubKeyLenOffset+1])
-
-	if 2+pLen+2+gLen+2+pubKeyLen > len(skx.key) {
-		return errServerKeyExchange
-	}
-	serverPubKey := skx.key[pubKeyLenOffset+2 : pubKeyLenOffset+2+pubKeyLen]
-
-	sig := skx.key[pubKeyLenOffset+2+pubKeyLen:]
 	if len(sig) < 2 {
 		return errServerKeyExchange
 	}
@@ -783,13 +763,12 @@ func (ka *dheKeyAgreement) processServerKeyExchange(config *Config, clientHello 
 		}
 	}
 
-	sigLen := int(sig[0])<<8 | int(sig[1])
-	if sigLen+2 != len(sig) {
+	sig, rest, err = parseUint16Chunk(sig)
+	if err != nil || len(rest) != 0 {
 		return errServerKeyExchange
 	}
-	sig = sig[2:]
 
-	lenServerDHParams := 2 + pLen + 2 + gLen + 2 + pubKeyLen
+	lenServerDHParams := 2 + len(serverP) + 2 + len(serverG) + 2 + len(serverPubKey)
 	serverDHParams := make([]byte, lenServerDHParams)   // we know the exact size in advance
 	copy(serverDHParams, skx.key[:lenServerDHParams+1]) // everything in the skx up until the sig
 	digest, hashFunc, err := hashForServerKeyExchange(sigAndHash, ka.version, clientHello.random, serverHello.random, serverDHParams)

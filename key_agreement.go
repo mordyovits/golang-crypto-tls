@@ -790,7 +790,10 @@ func (ka *dheKeyAgreement) processServerKeyExchange(config *Config, clientHello 
 		return errors.New("tls: unknown DHE signature algorithm")
 	}
 
-	// store server's dh params in ka
+	// validate & store server's dh params in ka
+	if len(serverP) < 128 {
+		return errors.New("tls: DH primes < 1024 bits are not supported")
+	}
 	ka.dhp.P = new(big.Int).SetBytes(serverP)
 	ka.dhp.G = new(big.Int).SetBytes(serverG)
 	err = validateDhParams(ka.dhp)
@@ -989,7 +992,10 @@ func (ka *dhePskKeyAgreement) processServerKeyExchange(config *Config, clientHel
 		return errServerKeyExchange
 	}
 
-	// store server's dh params in ka
+	// validate and store server's dh params in ka
+	if len(pBytes) < 128 {
+		return errors.New("tls: DH primes < 1024 bits are not supported")
+	}
 	ka.dhp.P = new(big.Int).SetBytes(pBytes)
 	ka.dhp.G = new(big.Int).SetBytes(gBytes)
 	err := validateDhParams(ka.dhp)

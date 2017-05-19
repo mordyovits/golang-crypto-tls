@@ -474,17 +474,17 @@ func (ka *ecdheKeyAgreement) generateClientKeyExchange(config *Config, clientHel
 	return preMasterSecret, ckx, nil
 }
 
-// returns chunk, rest, error
-func parseUint16Chunk(data []byte) ([]byte, []byte, error) {
+// returns chunk, rest, ok
+func parseUint16Chunk(data []byte) ([]byte, []byte, bool) {
 	if len(data) < 2 {
-		return nil, nil, errors.New("chunk data invalid")
+		return nil, nil, false
 	}
 	length := int(data[0])<<8 | int(data[1])
 	if len(data) < 2+length {
-		return nil, nil, errors.New("chunk data invalid")
+		return nil, nil, false
 	}
 	chunk := data[2 : 2+length]
-	return chunk, data[2+length:], nil
+	return chunk, data[2+length:], true
 }
 
 type pskKeyAgreement struct {
@@ -519,8 +519,8 @@ func (ka *pskKeyAgreement) processClientKeyExchange(config *Config, cert *Certif
 		return nil, errors.New("tls: missing PSK key function")
 	}
 
-	identityBytes, rest, err := parseUint16Chunk(ckx.ciphertext)
-	if err != nil || len(rest) != 0 {
+	identityBytes, rest, ok := parseUint16Chunk(ckx.ciphertext)
+	if !ok || len(rest) != 0 {
 		return nil, errClientKeyExchange
 	}
 
@@ -548,8 +548,8 @@ func (ka *pskKeyAgreement) processClientKeyExchange(config *Config, cert *Certif
 
 func (ka *pskKeyAgreement) processServerKeyExchange(config *Config, clientHello *clientHelloMsg, serverHello *serverHelloMsg, cert *x509.Certificate, skx *serverKeyExchangeMsg) error {
 	// per RFC 4279 server can send a "identity hint", so stash it in the ka
-	hint, rest, err := parseUint16Chunk(skx.key)
-	if err != nil || len(rest) != 0 {
+	hint, rest, ok := parseUint16Chunk(skx.key)
+	if !ok || len(rest) != 0 {
 		return errServerKeyExchange
 	}
 	ka.identityHint = hint
@@ -716,8 +716,8 @@ func (ka *dheKeyAgreement) generateServerKeyExchange(config *Config, cert *Certi
 }
 
 func (ka *dheKeyAgreement) processClientKeyExchange(config *Config, cert *Certificate, ckx *clientKeyExchangeMsg, version uint16) ([]byte, error) {
-	clientPubKeyBytes, rest, err := parseUint16Chunk(ckx.ciphertext)
-	if err != nil || len(rest) != 0 {
+	clientPubKeyBytes, rest, ok := parseUint16Chunk(ckx.ciphertext)
+	if !ok || len(rest) != 0 {
 		return nil, errClientKeyExchange
 	}
 	clientPubKey := new(big.Int).SetBytes(clientPubKeyBytes)
@@ -733,16 +733,16 @@ func (ka *dheKeyAgreement) processClientKeyExchange(config *Config, cert *Certif
 }
 
 func (ka *dheKeyAgreement) processServerKeyExchange(config *Config, clientHello *clientHelloMsg, serverHello *serverHelloMsg, cert *x509.Certificate, skx *serverKeyExchangeMsg) error {
-	serverP, rest, err := parseUint16Chunk(skx.key)
-	if err != nil {
+	serverP, rest, ok := parseUint16Chunk(skx.key)
+	if !ok {
 		return errServerKeyExchange
 	}
-	serverG, rest, err := parseUint16Chunk(rest)
-	if err != nil {
+	serverG, rest, ok := parseUint16Chunk(rest)
+	if !ok {
 		return errServerKeyExchange
 	}
-	serverPubKey, sig, err := parseUint16Chunk(rest)
-	if err != nil {
+	serverPubKey, sig, ok := parseUint16Chunk(rest)
+	if !ok {
 		return errServerKeyExchange
 	}
 
@@ -763,8 +763,8 @@ func (ka *dheKeyAgreement) processServerKeyExchange(config *Config, clientHello 
 		}
 	}
 
-	sig, rest, err = parseUint16Chunk(sig)
-	if err != nil || len(rest) != 0 {
+	sig, rest, ok = parseUint16Chunk(sig)
+	if !ok || len(rest) != 0 {
 		return errServerKeyExchange
 	}
 
@@ -926,8 +926,8 @@ func (ka *dhePskKeyAgreement) processClientKeyExchange(config *Config, cert *Cer
 		return nil, errors.New("tls: missing PSK key function")
 	}
 
-	identityBytes, rest, err := parseUint16Chunk(ckx.ciphertext)
-	if err != nil {
+	identityBytes, rest, ok := parseUint16Chunk(ckx.ciphertext)
+	if !ok {
 		return nil, errClientKeyExchange
 	}
 	// RFC 4279 5.1 says it MUST be utf8
@@ -942,8 +942,8 @@ func (ka *dhePskKeyAgreement) processClientKeyExchange(config *Config, cert *Cer
 	lenPsk := len(psk)
 	// TODO(movits) here is where you'd alert unknown identity
 
-	clientPubKeyBytes, rest, err := parseUint16Chunk(rest)
-	if err != nil || len(rest) != 0 {
+	clientPubKeyBytes, rest, ok := parseUint16Chunk(rest)
+	if !ok || len(rest) != 0 {
 		return nil, errClientKeyExchange
 	}
 
@@ -970,29 +970,29 @@ func (ka *dhePskKeyAgreement) processClientKeyExchange(config *Config, cert *Cer
 
 func (ka *dhePskKeyAgreement) processServerKeyExchange(config *Config, clientHello *clientHelloMsg, serverHello *serverHelloMsg, cert *x509.Certificate, skx *serverKeyExchangeMsg) error {
 	// per RFC 4279 server can send a "identity hint", so stash it in the ka
-	hint, rest, err := parseUint16Chunk(skx.key)
-	if err != nil {
+	hint, rest, ok := parseUint16Chunk(skx.key)
+	if !ok {
 		return errServerKeyExchange
 	}
 	ka.identityHint = hint
 
-	pBytes, rest, err := parseUint16Chunk(rest)
-	if err != nil {
+	pBytes, rest, ok := parseUint16Chunk(rest)
+	if !ok {
 		return errServerKeyExchange
 	}
-	gBytes, rest, err := parseUint16Chunk(rest)
-	if err != nil {
+	gBytes, rest, ok := parseUint16Chunk(rest)
+	if !ok {
 		return errServerKeyExchange
 	}
-	pubKeyBytes, rest, err := parseUint16Chunk(rest)
-	if err != nil || len(rest) != 0 {
+	pubKeyBytes, rest, ok := parseUint16Chunk(rest)
+	if !ok || len(rest) != 0 {
 		return errServerKeyExchange
 	}
 
 	// store server's dh params in ka
 	ka.dhp.P = new(big.Int).SetBytes(pBytes)
 	ka.dhp.G = new(big.Int).SetBytes(gBytes)
-	err = validateDhParams(ka.dhp)
+	err := validateDhParams(ka.dhp)
 	if err != nil {
 		return err
 	}

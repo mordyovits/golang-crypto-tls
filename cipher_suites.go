@@ -129,6 +129,12 @@ var cipherSuites = []*cipherSuite{
 	{TLS_RSA_WITH_RC4_128_SHA, 16, 20, 0, rsaKA, suiteRSA | suiteDefaultOff, cipherRC4, macSHA1, nil},
 	{TLS_ECDHE_RSA_WITH_RC4_128_SHA, 16, 20, 0, ecdheRSAKA, suiteECDHE | suiteRSA | suiteDefaultOff, cipherRC4, macSHA1, nil},
 	{TLS_ECDHE_ECDSA_WITH_RC4_128_SHA, 16, 20, 0, ecdheECDSAKA, suiteECDHE | suiteECDSA | suiteDefaultOff, cipherRC4, macSHA1, nil},
+
+	//DH_anon
+	{TLS_DH_anon_WITH_AES_256_CBC_SHA256, 32, 32, 16, dheKA, suiteDHE | suiteNoCerts | suiteDefaultOff, cipherAES, macSHA256, nil},
+	{TLS_DH_anon_WITH_AES_128_CBC_SHA256, 16, 32, 16, dheKA, suiteDHE | suiteNoCerts | suiteDefaultOff, cipherAES, macSHA256, nil},
+	{TLS_DH_anon_WITH_AES_256_CBC_SHA, 32, 20, 16, dheKA, suiteDHE | suiteNoCerts | suiteDefaultOff, cipherAES, macSHA1, nil},
+	{TLS_DH_anon_WITH_AES_128_CBC_SHA, 16, 20, 16, dheKA, suiteDHE | suiteNoCerts | suiteDefaultOff, cipherAES, macSHA1, nil},
 }
 
 func cipherRC4(key, iv []byte, isRead bool) interface{} {
@@ -372,10 +378,14 @@ func ecdheRSAKA(version uint16) keyAgreement {
 	}
 }
 
+func dheKA(version uint16) keyAgreement {
+	return &dheKeyAgreement{}
+}
+
 // no dheECDSAKA because there's no implemented ciphersuite that uses DHE and ECDSA
 
 func dheRSAKA(version uint16) keyAgreement {
-	return &dheKeyAgreement{
+	return &dheRsaKeyAgreement{
 		sigType: signatureRSA,
 		version: version,
 	}
@@ -414,11 +424,15 @@ const (
 	TLS_RSA_WITH_3DES_EDE_CBC_SHA           uint16 = 0x000a
 	TLS_RSA_WITH_AES_128_CBC_SHA            uint16 = 0x002f
 	TLS_DHE_RSA_WITH_AES_128_CBC_SHA        uint16 = 0x0033
+	TLS_DH_anon_WITH_AES_128_CBC_SHA        uint16 = 0x0034
 	TLS_RSA_WITH_AES_256_CBC_SHA            uint16 = 0x0035
 	TLS_DHE_RSA_WITH_AES_256_CBC_SHA        uint16 = 0x0039
+	TLS_DH_anon_WITH_AES_256_CBC_SHA        uint16 = 0x003a
 	TLS_RSA_WITH_AES_128_CBC_SHA256         uint16 = 0x003c
 	TLS_DHE_RSA_WITH_AES_128_CBC_SHA256     uint16 = 0x0067
 	TLS_DHE_RSA_WITH_AES_256_CBC_SHA256     uint16 = 0x006b
+	TLS_DH_anon_WITH_AES_128_CBC_SHA256     uint16 = 0x006c
+	TLS_DH_anon_WITH_AES_256_CBC_SHA256     uint16 = 0x006d
 	TLS_PSK_WITH_AES_128_CBC_SHA            uint16 = 0x008C
 	TLS_PSK_WITH_AES_256_CBC_SHA            uint16 = 0x008D
 	TLS_DHE_PSK_WITH_AES_128_CBC_SHA        uint16 = 0x0090

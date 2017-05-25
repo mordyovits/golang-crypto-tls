@@ -596,18 +596,165 @@ type serverDheParams struct {
 }
 
 type dheKeyAgreement struct {
-	version uint16
-	sigType uint8
 	// stuff stored in ka by client
 	serverDheParams
 	// stuff stored in ka by server
 	x *big.Int // Server's private key
 }
 
+func (ka *dheKeyAgreement) generateServerKeyExchange(config *Config, cert *Certificate, clientHello *clientHelloMsg, hello *serverHelloMsg) (*serverKeyExchangeMsg, error) {
+	// Shouldn't possible for a DHE ciphersuite to have been chosen by a server with a nil
+	// DhParameters, but extra care
+	if config.DhParameters == nil {
+		return nil, errors.New("tls: config is missing Diffie-Hellman parameters needed for DHE ciphersuite")
+	}
+
+	pBytes := config.DhParameters.P.Bytes()
+	lenPBytes := len(pBytes)
+	gBytes := config.DhParameters.G.Bytes()
+	lenGBytes := len(gBytes)
+
+	// create a private key based on p and g
+	pMinus1 := new(big.Int).Sub(config.DhParameters.P, bigOne)
+	for {
+		var err error
+		if ka.x, err = rand.Int(config.rand(), pMinus1); err != nil {
+			return nil, err
+		}
+		if ka.x.Sign() > 0 {
+			break
+		}
+	}
+
+	// create a public key
+	pubKey := new(big.Int).Exp(config.DhParameters.G, ka.x, config.DhParameters.P)
+	pubKeyBytes := pubKey.Bytes()
+	lenPubKeyBytes := len(pubKeyBytes)
+
+	lenServerDHParams := 2 + lenPBytes + 2 + lenGBytes + 2 + lenPubKeyBytes
+	serverDHParams := make([]byte, lenServerDHParams)
+
+	// pack the serverDHparams
+	serverDHParams[0] = byte(lenPBytes >> 8)
+	serverDHParams[1] = byte(lenPBytes)
+	copy(serverDHParams[2:], pBytes)
+
+	gLenOffset := 2 + lenPBytes
+	serverDHParams[gLenOffset] = byte(lenGBytes >> 8)
+	serverDHParams[gLenOffset+1] = byte(lenGBytes)
+	copy(serverDHParams[gLenOffset+2:], gBytes)
+
+	pubKeyLenOffset := gLenOffset + 2 + lenGBytes
+	serverDHParams[pubKeyLenOffset] = byte(lenPubKeyBytes >> 8)
+	serverDHParams[pubKeyLenOffset+1] = byte(lenPubKeyBytes)
+	copy(serverDHParams[pubKeyLenOffset+2:], pubKeyBytes)
+
+	skx := new(serverKeyExchangeMsg)
+	skx.key = make([]byte, len(serverDHParams))
+	copy(skx.key, serverDHParams)
+
+	return skx, nil
+}
+
+func (ka *dheKeyAgreement) processClientKeyExchange(config *Config, cert *Certificate, ckx *clientKeyExchangeMsg, version uint16) ([]byte, error) {
+	clientPubKeyBytes, rest, ok := parseUint16Chunk(ckx.ciphertext)
+	if !ok || len(rest) != 0 {
+		return nil, errClientKeyExchange
+	}
+	clientPubKey := new(big.Int).SetBytes(clientPubKeyBytes)
+
+	pMinus1 := new(big.Int).Sub(config.DhParameters.P, bigOne)
+
+	if clientPubKey.Cmp(bigOne) <= 0 || clientPubKey.Cmp(pMinus1) >= 0 {
+		return nil, errors.New("tls: Client DH parameter out of bounds")
+	}
+	preMasterSecret := new(big.Int).Exp(clientPubKey, ka.x, config.DhParameters.P).Bytes()
+
+	return preMasterSecret, nil
+}
+
+func (ka *dheKeyAgreement) processServerKeyExchange(config *Config, clientHello *clientHelloMsg, serverHello *serverHelloMsg, cert *x509.Certificate, skx *serverKeyExchangeMsg) error {
+	serverP, rest, ok := parseUint16Chunk(skx.key)
+	if !ok {
+		return errServerKeyExchange
+	}
+	serverG, rest, ok := parseUint16Chunk(rest)
+	if !ok {
+		return errServerKeyExchange
+	}
+	serverPubKey, rest, ok := parseUint16Chunk(rest)
+	if !ok || len(rest) != 0 {
+		return errServerKeyExchange
+	}
+
+	// validate & store server's dh params in ka
+	if len(serverP) < 128 {
+		return errors.New("tls: DH primes < 1024 bits are not supported")
+	}
+	ka.dhp.P = new(big.Int).SetBytes(serverP)
+	ka.dhp.G = new(big.Int).SetBytes(serverG)
+	err := validateDhParams(ka.dhp)
+	if err != nil {
+		return err
+	}
+
+	ka.Ys = new(big.Int).SetBytes(serverPubKey)
+	// validate that the server's PubKey is non-zero
+	if ka.Ys.Cmp(bigZero) == 0 {
+		return errors.New("tls: invalid server DHE public key")
+	}
+
+	return nil
+}
+
+func (ka *dheKeyAgreement) generateClientKeyExchange(config *Config, clientHello *clientHelloMsg, cert *x509.Certificate) ([]byte, *clientKeyExchangeMsg, error) {
+	var preMasterSecret []byte
+
+	pMinus1 := new(big.Int).Sub(ka.dhp.P, bigOne)
+
+	// create a private key based on server's p and g
+	var x *big.Int
+	for {
+		var err error
+		if x, err = rand.Int(config.rand(), pMinus1); err != nil {
+			return nil, nil, err
+		}
+		if x.Sign() > 0 {
+			break
+		}
+	}
+
+	// create a public key and immediately get the bytes, since that's all we'll need
+	XBytes := new(big.Int).Exp(ka.dhp.G, x, ka.dhp.P).Bytes()
+	lenXBytes := len(XBytes)
+
+	// derive Z
+	// RFC 5346 8.1.2 The negotiated key (Z) is used as the pre_master_secret. Leading bytes of Z that
+	// contain all zero bits are stripped before it is used as the pre_master_secret.
+	if ka.Ys.Cmp(bigOne) <= 0 || ka.Ys.Cmp(pMinus1) >= 0 {
+		return nil, nil, errors.New("tls: Server DH parameter out of bounds")
+	}
+	preMasterSecret = new(big.Int).Exp(ka.Ys, x, ka.dhp.P).Bytes()
+
+	ckx := new(clientKeyExchangeMsg)
+	ckx.ciphertext = make([]byte, 2+lenXBytes)
+	ckx.ciphertext[0] = byte(lenXBytes >> 8)
+	ckx.ciphertext[1] = byte(lenXBytes)
+	copy(ckx.ciphertext[2:], XBytes)
+
+	return preMasterSecret, ckx, nil
+}
+
+type dheRsaKeyAgreement struct {
+	version uint16
+	sigType uint8
+	dheKeyAgreement
+}
+
 var bigZero = big.NewInt(0)
 var bigOne = big.NewInt(1)
 
-func (ka *dheKeyAgreement) generateServerKeyExchange(config *Config, cert *Certificate, clientHello *clientHelloMsg, hello *serverHelloMsg) (*serverKeyExchangeMsg, error) {
+func (ka *dheRsaKeyAgreement) generateServerKeyExchange(config *Config, cert *Certificate, clientHello *clientHelloMsg, hello *serverHelloMsg) (*serverKeyExchangeMsg, error) {
 	// Shouldn't possible for a DHE ciphersuite to have been chosen by a server with a nil
 	// DhParameters, but extra care
 	if config.DhParameters == nil {
@@ -715,7 +862,7 @@ func (ka *dheKeyAgreement) generateServerKeyExchange(config *Config, cert *Certi
 	return skx, nil
 }
 
-func (ka *dheKeyAgreement) processClientKeyExchange(config *Config, cert *Certificate, ckx *clientKeyExchangeMsg, version uint16) ([]byte, error) {
+func (ka *dheRsaKeyAgreement) processClientKeyExchange(config *Config, cert *Certificate, ckx *clientKeyExchangeMsg, version uint16) ([]byte, error) {
 	clientPubKeyBytes, rest, ok := parseUint16Chunk(ckx.ciphertext)
 	if !ok || len(rest) != 0 {
 		return nil, errClientKeyExchange
@@ -732,7 +879,7 @@ func (ka *dheKeyAgreement) processClientKeyExchange(config *Config, cert *Certif
 	return preMasterSecret, nil
 }
 
-func (ka *dheKeyAgreement) processServerKeyExchange(config *Config, clientHello *clientHelloMsg, serverHello *serverHelloMsg, cert *x509.Certificate, skx *serverKeyExchangeMsg) error {
+func (ka *dheRsaKeyAgreement) processServerKeyExchange(config *Config, clientHello *clientHelloMsg, serverHello *serverHelloMsg, cert *x509.Certificate, skx *serverKeyExchangeMsg) error {
 	serverP, rest, ok := parseUint16Chunk(skx.key)
 	if !ok {
 		return errServerKeyExchange
@@ -810,7 +957,7 @@ func (ka *dheKeyAgreement) processServerKeyExchange(config *Config, clientHello 
 	return nil
 }
 
-func (ka *dheKeyAgreement) generateClientKeyExchange(config *Config, clientHello *clientHelloMsg, cert *x509.Certificate) ([]byte, *clientKeyExchangeMsg, error) {
+func (ka *dheRsaKeyAgreement) generateClientKeyExchange(config *Config, clientHello *clientHelloMsg, cert *x509.Certificate) ([]byte, *clientKeyExchangeMsg, error) {
 	var preMasterSecret []byte
 
 	pMinus1 := new(big.Int).Sub(ka.dhp.P, bigOne)

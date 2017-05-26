@@ -119,6 +119,8 @@ var cipherSuites = []*cipherSuite{
 	// PSK ciphersuites use preshared keys
 	{TLS_RSA_PSK_WITH_AES_256_CBC_SHA, 32, 20, 16, pskRSAKA, suiteRSA | suiteDefaultOff, cipherAES, macSHA1, nil},
 	{TLS_RSA_PSK_WITH_AES_128_CBC_SHA, 16, 20, 16, pskRSAKA, suiteRSA | suiteDefaultOff, cipherAES, macSHA1, nil},
+	{TLS_DHE_PSK_WITH_AES_256_GCM_SHA384, 32, 0, 4, dhePSKKA, suiteDHE | suiteNoCerts | suiteTLS12 | suiteSHA384 | suiteDefaultOff, nil, nil, aeadAESGCM},
+	{TLS_DHE_PSK_WITH_AES_128_GCM_SHA256, 16, 0, 4, dhePSKKA, suiteDHE | suiteNoCerts | suiteTLS12 | suiteDefaultOff, nil, nil, aeadAESGCM},
 	{TLS_DHE_PSK_WITH_AES_256_CBC_SHA, 32, 20, 16, dhePSKKA, suiteDHE | suiteNoCerts | suiteDefaultOff, cipherAES, macSHA1, nil},
 	{TLS_DHE_PSK_WITH_AES_128_CBC_SHA256, 16, 32, 16, dhePSKKA, suiteDHE | suiteNoCerts | suiteDefaultOff, cipherAES, macSHA256, nil},
 	{TLS_DHE_PSK_WITH_AES_128_CBC_SHA, 16, 20, 16, dhePSKKA, suiteDHE | suiteNoCerts | suiteDefaultOff, cipherAES, macSHA1, nil},
@@ -452,6 +454,8 @@ const (
 	TLS_DHE_RSA_WITH_AES_256_GCM_SHA384     uint16 = 0x009f
 	TLS_PSK_WITH_AES_128_GCM_SHA256         uint16 = 0x00a8
 	TLS_PSK_WITH_AES_256_GCM_SHA384         uint16 = 0x00a9
+	TLS_DHE_PSK_WITH_AES_128_GCM_SHA256     uint16 = 0x00aa
+	TLS_DHE_PSK_WITH_AES_256_GCM_SHA384     uint16 = 0x00ab
 	TLS_PSK_WITH_AES_128_CBC_SHA256         uint16 = 0x00ae
 	TLS_DHE_PSK_WITH_AES_128_CBC_SHA256     uint16 = 0x00b2
 	TLS_ECDHE_ECDSA_WITH_RC4_128_SHA        uint16 = 0xc007

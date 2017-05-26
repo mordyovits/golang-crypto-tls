@@ -590,6 +590,128 @@ func (ka *pskKeyAgreement) generateClientKeyExchange(config *Config, clientHello
 	return preMasterSecret, ckx, nil
 }
 
+type pskRsaKeyAgreement struct {
+	pskKeyAgreement
+}
+
+func (ka *pskRsaKeyAgreement) generateServerKeyExchange(config *Config, cert *Certificate, clientHello *clientHelloMsg, hello *serverHelloMsg) (*serverKeyExchangeMsg, error) {
+	if config.GetPSKIdentityHint == nil {
+		return nil, nil
+	}
+
+	hint, err := config.GetPSKIdentityHint() // TODO what should be args to gethint()?
+	if err != nil {
+		return nil, err
+	}
+
+	if hint == nil {
+		return nil, nil
+	}
+
+	skx := new(serverKeyExchangeMsg)
+	skx.key = make([]byte, 2+len(hint))
+	skx.key[0] = byte(len(hint) >> 8)
+	skx.key[1] = byte(len(hint))
+	copy(skx.key[2:], hint)
+
+	return skx, nil
+}
+
+func (ka *pskRsaKeyAgreement) processClientKeyExchange(config *Config, cert *Certificate, ckx *clientKeyExchangeMsg, version uint16) ([]byte, error) {
+	identityBytes, rest, ok := parseUint16Chunk(ckx.ciphertext)
+	if !ok {
+		return nil, errClientKeyExchange
+	}
+
+	encrypted, rest, ok := parseUint16Chunk(rest)
+	if !ok || len(rest) != 0 {
+		return nil, errClientKeyExchange
+	}
+
+	psk, err := config.GetPSKKey(string(identityBytes))
+	if err != nil {
+		return nil, err
+	}
+	lenPsk := len(psk)
+	// TODO(movits) here is where you'd alert unknown identity
+
+	priv, ok := cert.PrivateKey.(crypto.Decrypter)
+	if !ok {
+		return nil, errors.New("tls: certificate private key does not implement crypto.Decrypter")
+	}
+	// Perform constant time RSA PKCS#1 v1.5 decryption
+	decrypted, err := priv.Decrypt(config.rand(), encrypted, &rsa.PKCS1v15DecryptOptions{SessionKeyLen: 48})
+	if err != nil {
+		return nil, err
+	}
+
+	preMasterSecret := make([]byte, 2+48+2+lenPsk)
+	preMasterSecret[1] = byte(48)
+	copy(preMasterSecret[2:50], decrypted)
+	preMasterSecret[50] = byte(lenPsk >> 8)
+	preMasterSecret[51] = byte(lenPsk)
+	copy(preMasterSecret[52:], psk)
+
+	return preMasterSecret, nil
+}
+
+func (ka *pskRsaKeyAgreement) processServerKeyExchange(config *Config, clientHello *clientHelloMsg, serverHello *serverHelloMsg, cert *x509.Certificate, skx *serverKeyExchangeMsg) error {
+	// per RFC 4279 server can send a "identity hint", so stash it in the ka
+	hint, rest, ok := parseUint16Chunk(skx.key)
+	if !ok || len(rest) != 0 {
+		return errServerKeyExchange
+	}
+	ka.identityHint = hint
+
+	return nil
+}
+
+func (ka *pskRsaKeyAgreement) generateClientKeyExchange(config *Config, clientHello *clientHelloMsg, cert *x509.Certificate) ([]byte, *clientKeyExchangeMsg, error) {
+	if config.GetPSKIdentity == nil || config.GetPSKKey == nil {
+		return nil, nil, errors.New("tls: missing psk functions in config")
+	}
+
+	identity, err := config.GetPSKIdentity(ka.identityHint)
+	if err != nil {
+		return nil, nil, err
+	}
+	lenIdentity := len(identity)
+
+	psk, err := config.GetPSKKey(identity)
+	if err != nil {
+		return nil, nil, err
+	}
+	lenPsk := len(psk)
+
+	preMasterSecret := make([]byte, 2+48+2+lenPsk)
+	preMasterSecret[1] = byte(48)
+	preMasterSecret[2] = byte(clientHello.vers >> 8)
+	preMasterSecret[3] = byte(clientHello.vers)
+	_, err = io.ReadFull(config.rand(), preMasterSecret[4:50])
+	if err != nil {
+		return nil, nil, err
+	}
+	preMasterSecret[50] = byte(lenPsk >> 8)
+	preMasterSecret[51] = byte(lenPsk)
+	copy(preMasterSecret[52:], psk)
+
+	encrypted, err := rsa.EncryptPKCS1v15(config.rand(), cert.PublicKey.(*rsa.PublicKey), preMasterSecret[2:50])
+	if err != nil {
+		return nil, nil, err
+	}
+
+	ckx := new(clientKeyExchangeMsg)
+	ckx.ciphertext = make([]byte, 2+lenIdentity+2+len(encrypted))
+	ckx.ciphertext[0] = byte(lenIdentity >> 8)
+	ckx.ciphertext[1] = byte(lenIdentity)
+	copy(ckx.ciphertext[2:2+lenIdentity], identity)
+	ckx.ciphertext[2+lenIdentity] = byte(len(encrypted) >> 8)
+	ckx.ciphertext[3+lenIdentity] = byte(len(encrypted))
+	copy(ckx.ciphertext[4+lenIdentity:], encrypted)
+
+	return preMasterSecret, ckx, nil
+}
+
 type serverDheParams struct {
 	dhp DhParams // Server's dh params
 	Ys  *big.Int // Server's pubkey

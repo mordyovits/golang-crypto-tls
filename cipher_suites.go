@@ -117,13 +117,13 @@ var cipherSuites = []*cipherSuite{
 	{TLS_DHE_RSA_WITH_AES_128_CBC_SHA, 16, 20, 16, dheRSAKA, suiteDHE | suiteRSA | suiteDefaultOff, cipherAES, macSHA1, nil},
 
 	// PSK ciphersuites use preshared keys
-	{TLS_PSK_WITH_AES_128_CBC_SHA, 16, 20, 16, pskKA, suiteNoCerts | suiteDefaultOff, cipherAES, macSHA1, nil},
-	{TLS_PSK_WITH_AES_256_CBC_SHA, 32, 20, 16, pskKA, suiteNoCerts | suiteDefaultOff, cipherAES, macSHA1, nil},
-	// DHE_PSK
-	//{TLS_DHE_PSK_WITH_AES_256_CBC_SHA384
+	{TLS_RSA_PSK_WITH_AES_256_CBC_SHA, 32, 20, 16, pskRSAKA, suiteDefaultOff, cipherAES, macSHA1, nil},
+	{TLS_RSA_PSK_WITH_AES_128_CBC_SHA, 16, 20, 16, pskRSAKA, suiteDefaultOff, cipherAES, macSHA1, nil},
 	{TLS_DHE_PSK_WITH_AES_256_CBC_SHA, 32, 20, 16, dhePSKKA, suiteDHE | suiteNoCerts | suiteDefaultOff, cipherAES, macSHA1, nil},
 	{TLS_DHE_PSK_WITH_AES_128_CBC_SHA256, 16, 32, 16, dhePSKKA, suiteDHE | suiteNoCerts | suiteDefaultOff, cipherAES, macSHA256, nil},
 	{TLS_DHE_PSK_WITH_AES_128_CBC_SHA, 16, 20, 16, dhePSKKA, suiteDHE | suiteNoCerts | suiteDefaultOff, cipherAES, macSHA1, nil},
+	{TLS_PSK_WITH_AES_256_CBC_SHA, 32, 20, 16, pskKA, suiteNoCerts | suiteDefaultOff, cipherAES, macSHA1, nil},
+	{TLS_PSK_WITH_AES_128_CBC_SHA, 16, 20, 16, pskKA, suiteNoCerts | suiteDefaultOff, cipherAES, macSHA1, nil},
 
 	// RC4-based cipher suites are disabled by default.
 	{TLS_RSA_WITH_RC4_128_SHA, 16, 20, 0, rsaKA, suiteRSA | suiteDefaultOff, cipherRC4, macSHA1, nil},
@@ -395,6 +395,10 @@ func pskKA(version uint16) keyAgreement {
 	return &pskKeyAgreement{}
 }
 
+func pskRSAKA(version uint16) keyAgreement {
+	return &pskRsaKeyAgreement{}
+}
+
 func dhePSKKA(version uint16) keyAgreement {
 	return &dhePskKeyAgreement{}
 }
@@ -437,6 +441,8 @@ const (
 	TLS_PSK_WITH_AES_256_CBC_SHA            uint16 = 0x008D
 	TLS_DHE_PSK_WITH_AES_128_CBC_SHA        uint16 = 0x0090
 	TLS_DHE_PSK_WITH_AES_256_CBC_SHA        uint16 = 0x0091
+	TLS_RSA_PSK_WITH_AES_128_CBC_SHA        uint16 = 0x0094
+	TLS_RSA_PSK_WITH_AES_256_CBC_SHA        uint16 = 0x0095
 	TLS_RSA_WITH_AES_128_GCM_SHA256         uint16 = 0x009c
 	TLS_RSA_WITH_AES_256_GCM_SHA384         uint16 = 0x009d
 	TLS_DHE_RSA_WITH_AES_128_GCM_SHA256     uint16 = 0x009e

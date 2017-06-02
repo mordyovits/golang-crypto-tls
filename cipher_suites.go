@@ -102,6 +102,7 @@ var cipherSuites = []*cipherSuite{
 	{TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA, 32, 20, 16, ecdheECDSAKA, suiteECDHE | suiteECDSA, cipherAES, macSHA1, nil},
 	{TLS_RSA_WITH_AES_128_GCM_SHA256, 16, 0, 4, rsaKA, suiteRSA | suiteTLS12, nil, nil, aeadAESGCM},
 	{TLS_RSA_WITH_AES_256_GCM_SHA384, 32, 0, 4, rsaKA, suiteRSA | suiteTLS12 | suiteSHA384, nil, nil, aeadAESGCM},
+	{TLS_RSA_WITH_AES_256_CBC_SHA256, 32, 32, 16, rsaKA, suiteRSA | suiteTLS12 | suiteDefaultOff, cipherAES, macSHA256, nil},
 	{TLS_RSA_WITH_AES_128_CBC_SHA256, 16, 32, 16, rsaKA, suiteRSA | suiteTLS12 | suiteDefaultOff, cipherAES, macSHA256, nil},
 	{TLS_RSA_WITH_AES_128_CBC_SHA, 16, 20, 16, rsaKA, suiteRSA, cipherAES, macSHA1, nil},
 	{TLS_RSA_WITH_AES_256_CBC_SHA, 32, 20, 16, rsaKA, suiteRSA, cipherAES, macSHA1, nil},
@@ -138,7 +139,9 @@ var cipherSuites = []*cipherSuite{
 	{TLS_ECDHE_RSA_WITH_RC4_128_SHA, 16, 20, 0, ecdheRSAKA, suiteECDHE | suiteRSA | suiteDefaultOff, cipherRC4, macSHA1, nil},
 	{TLS_ECDHE_ECDSA_WITH_RC4_128_SHA, 16, 20, 0, ecdheECDSAKA, suiteECDHE | suiteECDSA | suiteDefaultOff, cipherRC4, macSHA1, nil},
 
-	//DH_anon
+	// DH_anon
+	{TLS_DH_anon_WITH_AES_256_GCM_SHA384, 32, 0, 4, dheKA, suiteDHE | suiteNoCerts | suiteSHA384 | suiteTLS12 | suiteDefaultOff, nil, nil, aeadAESGCM},
+	{TLS_DH_anon_WITH_AES_128_GCM_SHA256, 16, 0, 4, dheKA, suiteDHE | suiteNoCerts | suiteTLS12 | suiteDefaultOff, nil, nil, aeadAESGCM},
 	{TLS_DH_anon_WITH_AES_256_CBC_SHA256, 32, 32, 16, dheKA, suiteDHE | suiteNoCerts | suiteDefaultOff, cipherAES, macSHA256, nil},
 	{TLS_DH_anon_WITH_AES_128_CBC_SHA256, 16, 32, 16, dheKA, suiteDHE | suiteNoCerts | suiteDefaultOff, cipherAES, macSHA256, nil},
 	{TLS_DH_anon_WITH_AES_256_CBC_SHA, 32, 20, 16, dheKA, suiteDHE | suiteNoCerts | suiteDefaultOff, cipherAES, macSHA1, nil},
@@ -441,6 +444,7 @@ const (
 	TLS_DHE_RSA_WITH_AES_256_CBC_SHA        uint16 = 0x0039
 	TLS_DH_anon_WITH_AES_256_CBC_SHA        uint16 = 0x003a
 	TLS_RSA_WITH_AES_128_CBC_SHA256         uint16 = 0x003c
+	TLS_RSA_WITH_AES_256_CBC_SHA256         uint16 = 0x003d
 	TLS_DHE_RSA_WITH_AES_128_CBC_SHA256     uint16 = 0x0067
 	TLS_DHE_RSA_WITH_AES_256_CBC_SHA256     uint16 = 0x006b
 	TLS_DH_anon_WITH_AES_128_CBC_SHA256     uint16 = 0x006c
@@ -455,6 +459,8 @@ const (
 	TLS_RSA_WITH_AES_256_GCM_SHA384         uint16 = 0x009d
 	TLS_DHE_RSA_WITH_AES_128_GCM_SHA256     uint16 = 0x009e
 	TLS_DHE_RSA_WITH_AES_256_GCM_SHA384     uint16 = 0x009f
+	TLS_DH_anon_WITH_AES_128_GCM_SHA256     uint16 = 0x00a6
+	TLS_DH_anon_WITH_AES_256_GCM_SHA384     uint16 = 0x00a7
 	TLS_PSK_WITH_AES_128_GCM_SHA256         uint16 = 0x00a8
 	TLS_PSK_WITH_AES_256_GCM_SHA384         uint16 = 0x00a9
 	TLS_DHE_PSK_WITH_AES_128_GCM_SHA256     uint16 = 0x00aa

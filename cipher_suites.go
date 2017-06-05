@@ -102,6 +102,7 @@ var cipherSuites = []*cipherSuite{
 	{TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA, 32, 20, 16, ecdheECDSAKA, suiteECDHE | suiteECDSA, cipherAES, macSHA1, nil},
 	{TLS_RSA_WITH_AES_128_GCM_SHA256, 16, 0, 4, rsaKA, suiteRSA | suiteTLS12, nil, nil, aeadAESGCM},
 	{TLS_RSA_WITH_AES_256_GCM_SHA384, 32, 0, 4, rsaKA, suiteRSA | suiteTLS12 | suiteSHA384, nil, nil, aeadAESGCM},
+	{TLS_RSA_WITH_AES_256_CBC_SHA256, 32, 32, 16, rsaKA, suiteRSA | suiteTLS12 | suiteDefaultOff, cipherAES, macSHA256, nil},
 	{TLS_RSA_WITH_AES_128_CBC_SHA256, 16, 32, 16, rsaKA, suiteRSA | suiteTLS12 | suiteDefaultOff, cipherAES, macSHA256, nil},
 	{TLS_RSA_WITH_AES_128_CBC_SHA, 16, 20, 16, rsaKA, suiteRSA, cipherAES, macSHA1, nil},
 	{TLS_RSA_WITH_AES_256_CBC_SHA, 32, 20, 16, rsaKA, suiteRSA, cipherAES, macSHA1, nil},
@@ -110,18 +111,30 @@ var cipherSuites = []*cipherSuite{
 
 	// DHE PFS ciphersuites are disabled by default due to slowness
 	{TLS_DHE_RSA_WITH_AES_256_GCM_SHA384, 32, 0, 4, dheRSAKA, suiteDHE | suiteRSA | suiteTLS12 | suiteSHA384 | suiteDefaultOff, nil, nil, aeadAESGCM},
-	{TLS_DHE_RSA_WITH_AES_128_GCM_SHA256, 16, 0, 4, dheRSAKA, suiteDHE | suiteRSA | suiteDefaultOff, nil, nil, aeadAESGCM},
+	{TLS_DHE_RSA_WITH_AES_128_GCM_SHA256, 16, 0, 4, dheRSAKA, suiteDHE | suiteRSA | suiteTLS12 | suiteDefaultOff, nil, nil, aeadAESGCM},
+	{TLS_DHE_RSA_WITH_CHACHA20_POLY1305_SHA256, 32, 0, 12, dheRSAKA, suiteDHE | suiteRSA | suiteTLS12 | suiteDefaultOff, nil, nil, aeadChaCha20Poly1305},
 	{TLS_DHE_RSA_WITH_AES_256_CBC_SHA256, 32, 32, 16, dheRSAKA, suiteDHE | suiteRSA | suiteDefaultOff, cipherAES, macSHA256, nil},
 	{TLS_DHE_RSA_WITH_AES_128_CBC_SHA256, 16, 32, 16, dheRSAKA, suiteDHE | suiteRSA | suiteDefaultOff, cipherAES, macSHA256, nil},
 	{TLS_DHE_RSA_WITH_AES_256_CBC_SHA, 32, 20, 16, dheRSAKA, suiteDHE | suiteRSA | suiteDefaultOff, cipherAES, macSHA1, nil},
 	{TLS_DHE_RSA_WITH_AES_128_CBC_SHA, 16, 20, 16, dheRSAKA, suiteDHE | suiteRSA | suiteDefaultOff, cipherAES, macSHA1, nil},
 
 	// PSK ciphersuites use preshared keys
-	{TLS_RSA_PSK_WITH_AES_256_CBC_SHA, 32, 20, 16, pskRSAKA, suiteDefaultOff, cipherAES, macSHA1, nil},
-	{TLS_RSA_PSK_WITH_AES_128_CBC_SHA, 16, 20, 16, pskRSAKA, suiteDefaultOff, cipherAES, macSHA1, nil},
+	{TLS_RSA_PSK_WITH_AES_256_GCM_SHA384, 32, 0, 4, pskRSAKA, suiteRSA | suiteTLS12 | suiteSHA384 | suiteDefaultOff, nil, nil, aeadAESGCM},
+	{TLS_RSA_PSK_WITH_AES_128_GCM_SHA256, 16, 0, 4, pskRSAKA, suiteRSA | suiteTLS12 | suiteDefaultOff, nil, nil, aeadAESGCM},
+	{TLS_RSA_PSK_WITH_CHACHA20_POLY1305_SHA256, 32, 0, 12, pskRSAKA, suiteRSA | suiteTLS12 | suiteDefaultOff, nil, nil, aeadChaCha20Poly1305},
+	{TLS_RSA_PSK_WITH_AES_128_CBC_SHA256, 16, 32, 16, pskRSAKA, suiteRSA | suiteDefaultOff, cipherAES, macSHA256, nil},
+	{TLS_RSA_PSK_WITH_AES_256_CBC_SHA, 32, 20, 16, pskRSAKA, suiteRSA | suiteDefaultOff, cipherAES, macSHA1, nil},
+	{TLS_RSA_PSK_WITH_AES_128_CBC_SHA, 16, 20, 16, pskRSAKA, suiteRSA | suiteDefaultOff, cipherAES, macSHA1, nil},
+	{TLS_DHE_PSK_WITH_AES_256_GCM_SHA384, 32, 0, 4, dhePSKKA, suiteDHE | suiteNoCerts | suiteTLS12 | suiteSHA384 | suiteDefaultOff, nil, nil, aeadAESGCM},
+	{TLS_DHE_PSK_WITH_AES_128_GCM_SHA256, 16, 0, 4, dhePSKKA, suiteDHE | suiteNoCerts | suiteTLS12 | suiteDefaultOff, nil, nil, aeadAESGCM},
+	{TLS_DHE_PSK_WITH_CHACHA20_POLY1305_SHA256, 32, 0, 12, dhePSKKA, suiteDHE | suiteNoCerts | suiteTLS12 | suiteDefaultOff, nil, nil, aeadChaCha20Poly1305},
 	{TLS_DHE_PSK_WITH_AES_256_CBC_SHA, 32, 20, 16, dhePSKKA, suiteDHE | suiteNoCerts | suiteDefaultOff, cipherAES, macSHA1, nil},
 	{TLS_DHE_PSK_WITH_AES_128_CBC_SHA256, 16, 32, 16, dhePSKKA, suiteDHE | suiteNoCerts | suiteDefaultOff, cipherAES, macSHA256, nil},
 	{TLS_DHE_PSK_WITH_AES_128_CBC_SHA, 16, 20, 16, dhePSKKA, suiteDHE | suiteNoCerts | suiteDefaultOff, cipherAES, macSHA1, nil},
+	{TLS_PSK_WITH_AES_256_GCM_SHA384, 32, 0, 4, pskKA, suiteNoCerts | suiteTLS12 | suiteSHA384 | suiteDefaultOff, nil, nil, aeadAESGCM},
+	{TLS_PSK_WITH_AES_128_GCM_SHA256, 16, 0, 4, pskKA, suiteNoCerts | suiteTLS12 | suiteDefaultOff, nil, nil, aeadAESGCM},
+	{TLS_PSK_WITH_CHACHA20_POLY1305_SHA256, 32, 0, 12, pskKA, suiteNoCerts | suiteTLS12 | suiteDefaultOff, nil, nil, aeadChaCha20Poly1305},
+	{TLS_PSK_WITH_AES_128_CBC_SHA256, 16, 32, 16, pskKA, suiteNoCerts | suiteDefaultOff, cipherAES, macSHA256, nil},
 	{TLS_PSK_WITH_AES_256_CBC_SHA, 32, 20, 16, pskKA, suiteNoCerts | suiteDefaultOff, cipherAES, macSHA1, nil},
 	{TLS_PSK_WITH_AES_128_CBC_SHA, 16, 20, 16, pskKA, suiteNoCerts | suiteDefaultOff, cipherAES, macSHA1, nil},
 
@@ -130,7 +143,9 @@ var cipherSuites = []*cipherSuite{
 	{TLS_ECDHE_RSA_WITH_RC4_128_SHA, 16, 20, 0, ecdheRSAKA, suiteECDHE | suiteRSA | suiteDefaultOff, cipherRC4, macSHA1, nil},
 	{TLS_ECDHE_ECDSA_WITH_RC4_128_SHA, 16, 20, 0, ecdheECDSAKA, suiteECDHE | suiteECDSA | suiteDefaultOff, cipherRC4, macSHA1, nil},
 
-	//DH_anon
+	// DH_anon
+	{TLS_DH_anon_WITH_AES_256_GCM_SHA384, 32, 0, 4, dheKA, suiteDHE | suiteNoCerts | suiteSHA384 | suiteTLS12 | suiteDefaultOff, nil, nil, aeadAESGCM},
+	{TLS_DH_anon_WITH_AES_128_GCM_SHA256, 16, 0, 4, dheKA, suiteDHE | suiteNoCerts | suiteTLS12 | suiteDefaultOff, nil, nil, aeadAESGCM},
 	{TLS_DH_anon_WITH_AES_256_CBC_SHA256, 32, 32, 16, dheKA, suiteDHE | suiteNoCerts | suiteDefaultOff, cipherAES, macSHA256, nil},
 	{TLS_DH_anon_WITH_AES_128_CBC_SHA256, 16, 32, 16, dheKA, suiteDHE | suiteNoCerts | suiteDefaultOff, cipherAES, macSHA256, nil},
 	{TLS_DH_anon_WITH_AES_256_CBC_SHA, 32, 20, 16, dheKA, suiteDHE | suiteNoCerts | suiteDefaultOff, cipherAES, macSHA1, nil},
@@ -424,45 +439,60 @@ func mutualCipherSuite(have []uint16, want uint16) *cipherSuite {
 //
 // Taken from http://www.iana.org/assignments/tls-parameters/tls-parameters.xml
 const (
-	TLS_RSA_WITH_RC4_128_SHA                uint16 = 0x0005
-	TLS_RSA_WITH_3DES_EDE_CBC_SHA           uint16 = 0x000a
-	TLS_RSA_WITH_AES_128_CBC_SHA            uint16 = 0x002f
-	TLS_DHE_RSA_WITH_AES_128_CBC_SHA        uint16 = 0x0033
-	TLS_DH_anon_WITH_AES_128_CBC_SHA        uint16 = 0x0034
-	TLS_RSA_WITH_AES_256_CBC_SHA            uint16 = 0x0035
-	TLS_DHE_RSA_WITH_AES_256_CBC_SHA        uint16 = 0x0039
-	TLS_DH_anon_WITH_AES_256_CBC_SHA        uint16 = 0x003a
-	TLS_RSA_WITH_AES_128_CBC_SHA256         uint16 = 0x003c
-	TLS_DHE_RSA_WITH_AES_128_CBC_SHA256     uint16 = 0x0067
-	TLS_DHE_RSA_WITH_AES_256_CBC_SHA256     uint16 = 0x006b
-	TLS_DH_anon_WITH_AES_128_CBC_SHA256     uint16 = 0x006c
-	TLS_DH_anon_WITH_AES_256_CBC_SHA256     uint16 = 0x006d
-	TLS_PSK_WITH_AES_128_CBC_SHA            uint16 = 0x008C
-	TLS_PSK_WITH_AES_256_CBC_SHA            uint16 = 0x008D
-	TLS_DHE_PSK_WITH_AES_128_CBC_SHA        uint16 = 0x0090
-	TLS_DHE_PSK_WITH_AES_256_CBC_SHA        uint16 = 0x0091
-	TLS_RSA_PSK_WITH_AES_128_CBC_SHA        uint16 = 0x0094
-	TLS_RSA_PSK_WITH_AES_256_CBC_SHA        uint16 = 0x0095
-	TLS_RSA_WITH_AES_128_GCM_SHA256         uint16 = 0x009c
-	TLS_RSA_WITH_AES_256_GCM_SHA384         uint16 = 0x009d
-	TLS_DHE_RSA_WITH_AES_128_GCM_SHA256     uint16 = 0x009e
-	TLS_DHE_RSA_WITH_AES_256_GCM_SHA384     uint16 = 0x009f
-	TLS_DHE_PSK_WITH_AES_128_CBC_SHA256     uint16 = 0x00b2
-	TLS_ECDHE_ECDSA_WITH_RC4_128_SHA        uint16 = 0xc007
-	TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA    uint16 = 0xc009
-	TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA    uint16 = 0xc00a
-	TLS_ECDHE_RSA_WITH_RC4_128_SHA          uint16 = 0xc011
-	TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA     uint16 = 0xc012
-	TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA      uint16 = 0xc013
-	TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA      uint16 = 0xc014
-	TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256 uint16 = 0xc023
-	TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256   uint16 = 0xc027
-	TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256   uint16 = 0xc02f
-	TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 uint16 = 0xc02b
-	TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384   uint16 = 0xc030
-	TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384 uint16 = 0xc02c
-	TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305    uint16 = 0xcca8
-	TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305  uint16 = 0xcca9
+	TLS_RSA_WITH_RC4_128_SHA                  uint16 = 0x0005
+	TLS_RSA_WITH_3DES_EDE_CBC_SHA             uint16 = 0x000a
+	TLS_RSA_WITH_AES_128_CBC_SHA              uint16 = 0x002f
+	TLS_DHE_RSA_WITH_AES_128_CBC_SHA          uint16 = 0x0033
+	TLS_DH_anon_WITH_AES_128_CBC_SHA          uint16 = 0x0034
+	TLS_RSA_WITH_AES_256_CBC_SHA              uint16 = 0x0035
+	TLS_DHE_RSA_WITH_AES_256_CBC_SHA          uint16 = 0x0039
+	TLS_DH_anon_WITH_AES_256_CBC_SHA          uint16 = 0x003a
+	TLS_RSA_WITH_AES_128_CBC_SHA256           uint16 = 0x003c
+	TLS_RSA_WITH_AES_256_CBC_SHA256           uint16 = 0x003d
+	TLS_DHE_RSA_WITH_AES_128_CBC_SHA256       uint16 = 0x0067
+	TLS_DHE_RSA_WITH_AES_256_CBC_SHA256       uint16 = 0x006b
+	TLS_DH_anon_WITH_AES_128_CBC_SHA256       uint16 = 0x006c
+	TLS_DH_anon_WITH_AES_256_CBC_SHA256       uint16 = 0x006d
+	TLS_PSK_WITH_AES_128_CBC_SHA              uint16 = 0x008C
+	TLS_PSK_WITH_AES_256_CBC_SHA              uint16 = 0x008D
+	TLS_DHE_PSK_WITH_AES_128_CBC_SHA          uint16 = 0x0090
+	TLS_DHE_PSK_WITH_AES_256_CBC_SHA          uint16 = 0x0091
+	TLS_RSA_PSK_WITH_AES_128_CBC_SHA          uint16 = 0x0094
+	TLS_RSA_PSK_WITH_AES_256_CBC_SHA          uint16 = 0x0095
+	TLS_RSA_WITH_AES_128_GCM_SHA256           uint16 = 0x009c
+	TLS_RSA_WITH_AES_256_GCM_SHA384           uint16 = 0x009d
+	TLS_DHE_RSA_WITH_AES_128_GCM_SHA256       uint16 = 0x009e
+	TLS_DHE_RSA_WITH_AES_256_GCM_SHA384       uint16 = 0x009f
+	TLS_DH_anon_WITH_AES_128_GCM_SHA256       uint16 = 0x00a6
+	TLS_DH_anon_WITH_AES_256_GCM_SHA384       uint16 = 0x00a7
+	TLS_PSK_WITH_AES_128_GCM_SHA256           uint16 = 0x00a8
+	TLS_PSK_WITH_AES_256_GCM_SHA384           uint16 = 0x00a9
+	TLS_DHE_PSK_WITH_AES_128_GCM_SHA256       uint16 = 0x00aa
+	TLS_DHE_PSK_WITH_AES_256_GCM_SHA384       uint16 = 0x00ab
+	TLS_RSA_PSK_WITH_AES_128_GCM_SHA256       uint16 = 0x00ac
+	TLS_RSA_PSK_WITH_AES_256_GCM_SHA384       uint16 = 0x00ad
+	TLS_PSK_WITH_AES_128_CBC_SHA256           uint16 = 0x00ae
+	TLS_DHE_PSK_WITH_AES_128_CBC_SHA256       uint16 = 0x00b2
+	TLS_RSA_PSK_WITH_AES_128_CBC_SHA256       uint16 = 0x00b6
+	TLS_ECDHE_ECDSA_WITH_RC4_128_SHA          uint16 = 0xc007
+	TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA      uint16 = 0xc009
+	TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA      uint16 = 0xc00a
+	TLS_ECDHE_RSA_WITH_RC4_128_SHA            uint16 = 0xc011
+	TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA       uint16 = 0xc012
+	TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA        uint16 = 0xc013
+	TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA        uint16 = 0xc014
+	TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256   uint16 = 0xc023
+	TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256     uint16 = 0xc027
+	TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256     uint16 = 0xc02f
+	TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256   uint16 = 0xc02b
+	TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384     uint16 = 0xc030
+	TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384   uint16 = 0xc02c
+	TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305      uint16 = 0xcca8
+	TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305    uint16 = 0xcca9
+	TLS_DHE_RSA_WITH_CHACHA20_POLY1305_SHA256 uint16 = 0xccaa
+	TLS_PSK_WITH_CHACHA20_POLY1305_SHA256     uint16 = 0xccab
+	TLS_DHE_PSK_WITH_CHACHA20_POLY1305_SHA256 uint16 = 0xccad
+	TLS_RSA_PSK_WITH_CHACHA20_POLY1305_SHA256 uint16 = 0xccae
 
 	// TLS_FALLBACK_SCSV isn't a standard cipher suite but an indicator
 	// that the client is doing version fallback. See

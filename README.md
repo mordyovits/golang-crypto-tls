@@ -62,7 +62,8 @@ The following 32 ciphersuites are added in this package:
 Since it's a fork of a built-in package, there are a few ways to use it, none perfect.  Here are the options:
 
 ## Replace the default package in $GOROOT
-This is the simplest option, but it requires modifying your Go installation
+This is the simplest option, but it requires modifying your Go installation:
+
 1. cd $GOROOT/src/crypto
 2. mv tls tls.bak
 3. git clone https://pathtothis/tls

@@ -66,7 +66,7 @@ This is the simplest option, but it requires modifying your Go installation:
 
 1. cd $GOROOT/src/crypto
 2. mv tls tls.bak
-3. git clone https://pathtothis/tls
+3. git clone https://pathtothis/golang-crypto-tls tls
 
 Then rebuild with go build -a
 

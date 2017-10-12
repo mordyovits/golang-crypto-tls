@@ -422,8 +422,8 @@ type Config struct {
 	VerifyPeerCertificate func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error
 
 	// PSK Server Function to provide a hint to the client about which identity
-	// the client should send. If the hint retruned is nil, the ServerKeyExchange
-	// is skipped, as per RFC 4297 Section 2.
+	// the client should send. If the hint returned is nil, the ServerKeyExchange
+	// is skipped, as per RFC 4279 Section 2.
 	GetPSKIdentityHint func() ([]byte, error)
 	// PSK Client Function to choose the identity to send to the server
 	// RFC 4279 5.1 insists the identity is utf8
